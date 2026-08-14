@@ -1,0 +1,97 @@
+{
+  "packet_id": "sample_packet",
+  "source_file": "sample_packet.pdf",
+  "page_count": 6,
+  "file_hash": "4adfdf0747555ca9",
+  "method": "baseline",
+  "processing_time_seconds": 0.18371859984472394,
+  "boundaries": [
+    {
+      "page_a": 1,
+      "page_b": 2,
+      "score": 0.600075128176169,
+      "is_boundary": false
+    },
+    {
+      "page_a": 2,
+      "page_b": 3,
+      "score": 0.5881459575469783,
+      "is_boundary": false
+    },
+    {
+      "page_a": 3,
+      "page_b": 4,
+      "score": 0.37773234932002653,
+      "is_boundary": true
+    },
+    {
+      "page_a": 4,
+      "page_b": 5,
+      "score": 0.6273160314898221,
+      "is_boundary": false
+    },
+    {
+      "page_a": 5,
+      "page_b": 6,
+      "score": 0.37903546181242925,
+      "is_boundary": true
+    }
+  ],
+  "documents": [
+    {
+      "document_id": "sample_packet_doc_001",
+      "page_start": 1,
+      "page_end": 3,
+      "page_numbers": [
+        1,
+        2,
+        3
+      ],
+      "document_type": "invoice",
+      "confidence": 1.0,
+      "candidates": [
+        [
+          "invoice",
+          1.0
+        ]
+      ],
+      "group_confidence": 0.5941105428615736
+    },
+    {
+      "document_id": "sample_packet_doc_002",
+      "page_start": 4,
+      "page_end": 5,
+      "page_numbers": [
+        4,
+        5
+      ],
+      "document_type": "resume",
+      "confidence": 1.0,
+      "candidates": [
+        [
+          "resume",
+          1.0
+        ]
+      ],
+      "group_confidence": 0.6273160314898221
+    },
+    {
+      "document_id": "sample_packet_doc_003",
+      "page_start": 6,
+      "page_end": 6,
+      "page_numbers": [
+        6
+      ],
+      "document_type": "passport",
+      "confidence": 0.75,
+      "candidates": [
+        [
+          "passport",
+          0.75
+        ]
+      ],
+      "group_confidence": 1.0
+    }
+  ],
+  "warnings": []
+}

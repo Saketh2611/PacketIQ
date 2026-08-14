@@ -1,0 +1,102 @@
+{
+  "document_id": "sample_packet_doc_003",
+  "document_type": "passport",
+  "confidence": 0.75,
+  "source": {
+    "packet_id": "sample_packet",
+    "source_file": "sample_packet.pdf",
+    "page_start": 6,
+    "page_end": 6
+  },
+  "content": {
+    "title": "PASSPORT",
+    "sections": [
+      {
+        "heading": null,
+        "page": 6,
+        "blocks": [
+          {
+            "type": "paragraph",
+            "text": "PASSPORT",
+            "page": 6,
+            "headers": null,
+            "rows": null,
+            "items": null
+          },
+          {
+            "type": "paragraph",
+            "text": "Type: P",
+            "page": 6,
+            "headers": null,
+            "rows": null,
+            "items": null
+          },
+          {
+            "type": "paragraph",
+            "text": "Country Code: EXA",
+            "page": 6,
+            "headers": null,
+            "rows": null,
+            "items": null
+          },
+          {
+            "type": "paragraph",
+            "text": "Passport No: AB1234567",
+            "page": 6,
+            "headers": null,
+            "rows": null,
+            "items": null
+          },
+          {
+            "type": "paragraph",
+            "text": "Surname: DOE",
+            "page": 6,
+            "headers": null,
+            "rows": null,
+            "items": null
+          },
+          {
+            "type": "paragraph",
+            "text": "Given Names: JOHN",
+            "page": 6,
+            "headers": null,
+            "rows": null,
+            "items": null
+          },
+          {
+            "type": "paragraph",
+            "text": "Nationality: EXAMPLE",
+            "page": 6,
+            "headers": null,
+            "rows": null,
+            "items": null
+          },
+          {
+            "type": "paragraph",
+            "text": "Date of Birth: 01 JAN 1990",
+            "page": 6,
+            "headers": null,
+            "rows": null,
+            "items": null
+          }
+        ]
+      }
+    ]
+  },
+  "metadata": {
+    "packet_id": "sample_packet",
+    "document_id": "sample_packet_doc_003",
+    "document_type": "passport",
+    "source_file": "sample_packet.pdf",
+    "page_start": 6,
+    "page_end": 6,
+    "page_count": 1,
+    "extraction_method": "native",
+    "processing_timestamp": "2026-08-13T11:31:36.992987+00:00",
+    "content_hash": "9c660ea2b3b8796d",
+    "model_versions": {
+      "embedding": "sentence-transformers/all-MiniLM-L6-v2"
+    },
+    "warnings": []
+  }
+}

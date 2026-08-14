@@ -1,0 +1,150 @@
+{
+  "document_id": "sample_packet_doc_001",
+  "document_type": "invoice",
+  "confidence": 1.0,
+  "source": {
+    "packet_id": "sample_packet",
+    "source_file": "sample_packet.pdf",
+    "page_start": 1,
+    "page_end": 3
+  },
+  "content": {
+    "title": "INVOICE",
+    "sections": [
+      {
+        "heading": null,
+        "page": 1,
+        "blocks": [
+          {
+            "type": "paragraph",
+            "text": "INVOICE",
+            "page": 1,
+            "headers": null,
+            "rows": null,
+            "items": null
+          },
+          {
+            "type": "paragraph",
+            "text": "Bill To: Acme Corporation",
+            "page": 1,
+            "headers": null,
+            "rows": null,
+            "items": null
+          },
+          {
+            "type": "paragraph",
+            "text": "123 Main Street",
+            "page": 1,
+            "headers": null,
+            "rows": null,
+            "items": null
+          },
+          {
+            "type": "paragraph",
+            "text": "Invoice #INV-2024-001",
+            "page": 1,
+            "headers": null,
+            "rows": null,
+            "items": null
+          },
+          {
+            "type": "paragraph",
+            "text": "Date: 2024-01-15",
+            "page": 1,
+            "headers": null,
+            "rows": null,
+            "items": null
+          },
+          {
+            "type": "paragraph",
+            "text": "INVOICE (continued)",
+            "page": 2,
+            "headers": null,
+            "rows": null,
+            "items": null
+          },
+          {
+            "type": "paragraph",
+            "text": "Item          Qty    Amount",
+            "page": 2,
+            "headers": null,
+            "rows": null,
+            "items": null
+          },
+          {
+            "type": "paragraph",
+            "text": "Laptop         2     50000",
+            "page": 2,
+            "headers": null,
+            "rows": null,
+            "items": null
+          },
+          {
+            "type": "paragraph",
+            "text": "Mouse          5       500",
+            "page": 2,
+            "headers": null,
+            "rows": null,
+            "items": null
+          },
+          {
+            "type": "paragraph",
+            "text": "Subtotal: 50500",
+            "page": 2,
+            "headers": null,
+            "rows": null,
+            "items": null
+          },
+          {
+            "type": "paragraph",
+            "text": "INVOICE (continued)",
+            "page": 3,
+            "headers": null,
+            "rows": null,
+            "items": null
+          },
+          {
+            "type": "paragraph",
+            "text": "Tax (4%): 2020",
+            "page": 3,
+            "headers": null,
+            "rows": null,
+            "items": null
+          },
+          {
+            "type": "paragraph",
+            "text": "Total Amount: \u00b752,340",
+            "page": 3,
+            "headers": null,
+            "rows": null,
+            "items": null
+          },
+          {
+            "type": "paragraph",
+            "text": "Payment Terms: Net 30 days",
+            "page": 3,
+            "headers": null,
+            "rows": null,
+            "items": null
+          }
+        ]
+      }
+    ]
+  },
+  "metadata": {
+    "packet_id": "sample_packet",
+    "document_id": "sample_packet_doc_001",
+    "document_type": "invoice",
+    "source_file": "sample_packet.pdf",
+    "page_start": 1,
+    "page_end": 3,
+    "page_count": 3,
+    "extraction_method": "native",
+    "processing_timestamp": "2026-08-13T11:31:36.992987+00:00",
+    "content_hash": "3242e93978d6ccdd",
+    "model_versions": {
+      "embedding": "sentence-transformers/all-MiniLM-L6-v2"
+    },
+    "warnings": []
+  }
+}

@@ -1,0 +1,57 @@
+{
+  "query": "What is the total amount on the invoice?",
+  "results": [
+    {
+      "document_id": "sample_packet_doc_001",
+      "document_type": "invoice",
+      "page": 1,
+      "chunk_id": "sample_packet_doc_001_chunk_005",
+      "evidence": "Date: 2024-01-15",
+      "score": 1.0,
+      "vector_score": 0.22360679507255554,
+      "rerank_score": null
+    },
+    {
+      "document_id": "sample_packet_doc_001",
+      "document_type": "invoice",
+      "page": 3,
+      "chunk_id": "sample_packet_doc_001_chunk_013",
+      "evidence": "Total Amount: \u00b752,340",
+      "score": 0.8164965769021161,
+      "vector_score": 0.18257418274879456,
+      "rerank_score": null
+    },
+    {
+      "document_id": "sample_packet_doc_001",
+      "document_type": "invoice",
+      "page": 2,
+      "chunk_id": "sample_packet_doc_001_chunk_007",
+      "evidence": "Item          Qty    Amount",
+      "score": 0.8164965769021161,
+      "vector_score": 0.18257418274879456,
+      "rerank_score": null
+    },
+    {
+      "document_id": "sample_packet_doc_002",
+      "document_type": "resume",
+      "page": 4,
+      "chunk_id": "sample_packet_doc_002_chunk_006",
+      "evidence": "- Junior Developer at StartupInc (2018-2020)",
+      "score": 0.5773502702052873,
+      "vector_score": 0.12909944355487823,
+      "rerank_score": null
+    },
+    {
+      "document_id": "sample_packet_doc_002",
+      "document_type": "resume",
+      "page": 4,
+      "chunk_id": "sample_packet_doc_002_chunk_005",
+      "evidence": "- Senior Developer at TechCo (2020-2024)",
+      "score": 0.5773502702052873,
+      "vector_score": 0.12909944355487823,
+      "rerank_score": null
+    }
+  ],
+  "latency_seconds": 0.0004305001348257065,
+  "warnings": []
+}

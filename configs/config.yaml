@@ -1,0 +1,48 @@
+paths:
+  data_dir: data
+  raw_dir: data/raw
+  processed_dir: data/processed
+  indexes_dir: data/indexes
+  samples_dir: data/samples
+  outputs_dir: outputs
+  models_dir: models
+
+stage1:
+  boundary_threshold: 0.5
+  semantic_weight: 0.4
+  layout_weight: 0.2
+  structural_weight: 0.2
+  type_agreement_weight: 0.2
+  classifier: logistic_regression
+  random_seed: 42
+
+dataset:
+  name: nutrientdocs/openpss-mirror
+  config: SHORT
+  test_name: nutrientdocs/doc-split-benchmark
+  test_config: our200
+
+stage2:
+  max_chunk_chars: 1000
+  chunk_overlap: 100
+  preserve_tables: true
+
+stage3:
+  top_k: 5
+  retrieval_top_n: 50
+  rerank_top_n: 20
+  use_reranker: false
+  normalize_embeddings: true
+
+ocr:
+  engine: pytesseract
+  min_text_length: 50
+  render_dpi: 150
+
+api:
+  host: "0.0.0.0"
+  port: 8000
+
+logging:
+  level: INFO
+  format: json

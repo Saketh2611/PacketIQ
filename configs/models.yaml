@@ -1,0 +1,35 @@
+embedding:
+  model_name: sentence-transformers/all-MiniLM-L6-v2
+  batch_size: 32
+  normalize: true
+  device: cpu
+  cache_dir: models/cache
+
+reranker:
+  model_name: cross-encoder/ms-marco-MiniLM-L-6-v2
+  batch_size: 16
+  enabled: false
+  device: cpu
+
+boundary_classifier:
+  type: logistic_regression
+  class_weight: balanced
+  max_iter: 1000
+
+document_classifier:
+  type: embedding
+  confidence_threshold: 0.3
+  top_k_candidates: 3
+
+ocr:
+  engine: pytesseract
+  language: eng
+
+llm:
+  provider: gemini
+  enabled: false
+  model: gemini-pro
+
+vector_store:
+  backend: faiss
+  index_type: flat

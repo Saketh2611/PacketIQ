@@ -1,0 +1,62 @@
+{
+  "case": "empty_query",
+  "query": "",
+  "result": {
+    "query": "",
+    "results": [
+      {
+        "document_id": "sample_packet_doc_003",
+        "document_type": "passport",
+        "page": 6,
+        "chunk_id": "sample_packet_doc_003_chunk_008",
+        "evidence": "Date of Birth: 01 JAN 1990",
+        "score": 1.0,
+        "vector_score": 0.0,
+        "rerank_score": null
+      },
+      {
+        "document_id": "sample_packet_doc_003",
+        "document_type": "passport",
+        "page": 6,
+        "chunk_id": "sample_packet_doc_003_chunk_007",
+        "evidence": "Nationality: EXAMPLE",
+        "score": 1.0,
+        "vector_score": 0.0,
+        "rerank_score": null
+      },
+      {
+        "document_id": "sample_packet_doc_003",
+        "document_type": "passport",
+        "page": 6,
+        "chunk_id": "sample_packet_doc_003_chunk_006",
+        "evidence": "Given Names: JOHN",
+        "score": 1.0,
+        "vector_score": 0.0,
+        "rerank_score": null
+      },
+      {
+        "document_id": "sample_packet_doc_003",
+        "document_type": "passport",
+        "page": 6,
+        "chunk_id": "sample_packet_doc_003_chunk_005",
+        "evidence": "Surname: DOE",
+        "score": 1.0,
+        "vector_score": 0.0,
+        "rerank_score": null
+      },
+      {
+        "document_id": "sample_packet_doc_003",
+        "document_type": "passport",
+        "page": 6,
+        "chunk_id": "sample_packet_doc_003_chunk_004",
+        "evidence": "Passport No: AB1234567",
+        "score": 1.0,
+        "vector_score": 0.0,
+        "rerank_score": null
+      }
+    ],
+    "latency_seconds": 0.00027490011416375637,
+    "warnings": []
+  },
+  "note": "Empty query returns low-confidence or no results"
+}

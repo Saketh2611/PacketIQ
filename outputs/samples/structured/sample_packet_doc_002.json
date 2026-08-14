@@ -1,0 +1,126 @@
+{
+  "document_id": "sample_packet_doc_002",
+  "document_type": "resume",
+  "confidence": 1.0,
+  "source": {
+    "packet_id": "sample_packet",
+    "source_file": "sample_packet.pdf",
+    "page_start": 4,
+    "page_end": 5
+  },
+  "content": {
+    "title": "CURRICULUM VITAE",
+    "sections": [
+      {
+        "heading": null,
+        "page": 4,
+        "blocks": [
+          {
+            "type": "paragraph",
+            "text": "CURRICULUM VITAE",
+            "page": 4,
+            "headers": null,
+            "rows": null,
+            "items": null
+          },
+          {
+            "type": "paragraph",
+            "text": "John Doe",
+            "page": 4,
+            "headers": null,
+            "rows": null,
+            "items": null
+          },
+          {
+            "type": "paragraph",
+            "text": "Software Engineer",
+            "page": 4,
+            "headers": null,
+            "rows": null,
+            "items": null
+          },
+          {
+            "type": "paragraph",
+            "text": "Experience:",
+            "page": 4,
+            "headers": null,
+            "rows": null,
+            "items": null
+          },
+          {
+            "type": "paragraph",
+            "text": "- Senior Developer at TechCo (2020-2024)",
+            "page": 4,
+            "headers": null,
+            "rows": null,
+            "items": null
+          },
+          {
+            "type": "paragraph",
+            "text": "- Junior Developer at StartupInc (2018-2020)",
+            "page": 4,
+            "headers": null,
+            "rows": null,
+            "items": null
+          },
+          {
+            "type": "paragraph",
+            "text": "RESUME (continued)",
+            "page": 5,
+            "headers": null,
+            "rows": null,
+            "items": null
+          },
+          {
+            "type": "paragraph",
+            "text": "Education:",
+            "page": 5,
+            "headers": null,
+            "rows": null,
+            "items": null
+          },
+          {
+            "type": "paragraph",
+            "text": "- BS Computer Science, State University (2018)",
+            "page": 5,
+            "headers": null,
+            "rows": null,
+            "items": null
+          },
+          {
+            "type": "paragraph",
+            "text": "Skills:",
+            "page": 5,
+            "headers": null,
+            "rows": null,
+            "items": null
+          },
+          {
+            "type": "paragraph",
+            "text": "Python, Machine Learning, FastAPI",
+            "page": 5,
+            "headers": null,
+            "rows": null,
+            "items": null
+          }
+        ]
+      }
+    ]
+  },
+  "metadata": {
+    "packet_id": "sample_packet",
+    "document_id": "sample_packet_doc_002",
+    "document_type": "resume",
+    "source_file": "sample_packet.pdf",
+    "page_start": 4,
+    "page_end": 5,
+    "page_count": 2,
+    "extraction_method": "native",
+    "processing_timestamp": "2026-08-13T11:31:36.992987+00:00",
+    "content_hash": "cabca594c0d713bd",
+    "model_versions": {
+      "embedding": "sentence-transformers/all-MiniLM-L6-v2"
+    },
+    "warnings": []
+  }
+}
