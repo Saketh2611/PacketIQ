@@ -14,6 +14,20 @@ from document_intelligence.utils.logging import get_logger
 logger = get_logger(__name__)
 
 EMBEDDING_DIM = 384
+TRUE_VALUES = {"1", "true", "yes", "on"}
+FALSE_VALUES = {"0", "false", "no", "off"}
+
+
+def _env_flag(name: str, default: bool) -> bool:
+    value = os.getenv(name)
+    if value is None:
+        return default
+    normalized = value.strip().lower()
+    if normalized in TRUE_VALUES:
+        return True
+    if normalized in FALSE_VALUES:
+        return False
+    return default
 
 
 def _hash_embed(texts: list[str], dim: int = EMBEDDING_DIM) -> np.ndarray:
@@ -42,16 +56,18 @@ class EmbeddingModel:
         normalize: bool | None = None,
         device: str | None = None,
         use_hash_fallback: bool | None = None,
+        local_files_only: bool | None = None,
     ) -> None:
         settings = get_settings()
         self.model_name = model_name or settings.embedding_model
         self.batch_size = batch_size or settings.embedding_batch_size
         self.normalize = normalize if normalize is not None else settings.normalize_embeddings
         self.device = device or settings.device
-        self.use_hash_fallback = (
-            use_hash_fallback
-            if use_hash_fallback is not None
-            else os.getenv("USE_HASH_EMBEDDINGS", "").lower() in ("1", "true", "yes")
+        self.use_hash_fallback = use_hash_fallback if use_hash_fallback is not None else _env_flag("USE_HASH_EMBEDDINGS", False)
+        self.local_files_only = (
+            local_files_only
+            if local_files_only is not None
+            else _env_flag("EMBEDDING_LOCAL_FILES_ONLY", True)
         )
         self._model: Any = None
         self._cache: dict[str, np.ndarray] = {}
@@ -67,11 +83,22 @@ class EmbeddingModel:
         try:
             from sentence_transformers import SentenceTransformer
 
-            logger.info("Loading embedding model", model=self.model_name)
-            self._model = SentenceTransformer(self.model_name, device=self.device)
+            logger.info(
+                "Loading embedding model",
+                model=self.model_name,
+                local_files_only=self.local_files_only,
+            )
+            self._model = SentenceTransformer(
+                self.model_name,
+                device=self.device,
+                local_files_only=self.local_files_only,
+            )
         except Exception as exc:
-            logger.warning("SentenceTransformer unavailable, using hash fallback", error=str(exc))
-            self._fallback = True
+            raise RuntimeError(
+                "SentenceTransformer embeddings could not be loaded. "
+                "Set USE_HASH_EMBEDDINGS=1 to explicitly use the deterministic hash fallback, "
+                "or set EMBEDDING_LOCAL_FILES_ONLY=false to allow a model download."
+            ) from exc
 
     def encode(self, texts: list[str], use_cache: bool = True) -> np.ndarray:
         self._load_model()

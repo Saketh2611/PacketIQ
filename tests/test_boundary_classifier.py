@@ -2,7 +2,9 @@
 
 import numpy as np
 import pytest
+from sklearn.model_selection import train_test_split
 
+from document_intelligence.config.settings import get_settings
 from document_intelligence.stage1.boundary_classifier import BoundaryClassifier
 from document_intelligence.stage1.page_features import PagePairFeatures
 
@@ -19,6 +21,25 @@ def test_classifier_train_predict():
     ]
     decisions = clf.predict_decisions(pairs)
     assert len(decisions) == 5
+
+
+def test_scaler_fits_training_split_only():
+    clf = BoundaryClassifier(model_type="logistic_regression")
+    X = np.arange(180, dtype=float).reshape(20, 9)
+    X[-2:] += 10000
+    y = np.array([1] * 10 + [0] * 10)
+    X_train, _, _, _ = train_test_split(
+        X,
+        y,
+        test_size=0.3,
+        random_state=get_settings().random_seed,
+        stratify=y,
+    )
+
+    clf.train(X, y, val_size=0.3)
+
+    assert np.allclose(clf.scaler.mean_, X_train.mean(axis=0))
+    assert not np.allclose(clf.scaler.mean_, X.mean(axis=0))
 
 
 def test_classifier_save_load(tmp_path):

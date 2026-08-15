@@ -69,6 +69,15 @@ class PageFeatureBuilder:
         self._embedding_cache[page.page_id] = emb
         return emb
 
+    def _prefetch_embeddings(self, pages: list[PageRepresentation]) -> None:
+        missing = [page for page in pages if page.page_id not in self._embedding_cache]
+        if not missing:
+            return
+        texts = [page.text.strip() or " " for page in missing]
+        embeddings = self.embedder.encode(texts)
+        for page, emb in zip(missing, embeddings):
+            self._embedding_cache[page.page_id] = emb
+
     def _predict_page_type_hint(self, page: PageRepresentation) -> str:
         from document_intelligence.stage1.document_classifier import HeuristicDocumentClassifier
 
@@ -114,6 +123,7 @@ class PageFeatureBuilder:
         )
 
     def build_all_pairs(self, pages: list[PageRepresentation]) -> list[PagePairFeatures]:
+        self._prefetch_embeddings(pages)
         pairs: list[PagePairFeatures] = []
         for i in range(len(pages) - 1):
             pairs.append(self.build_pair(pages[i], pages[i + 1]))

@@ -11,11 +11,11 @@ import pytest
 from document_intelligence.ingestion.page_extractor import PageRepresentation
 
 
-@pytest.fixture(scope="session", autouse=True)
-def use_hash_embeddings():
-    os.environ["USE_HASH_EMBEDDINGS"] = "1"
-    yield
-    os.environ.pop("USE_HASH_EMBEDDINGS", None)
+# @pytest.fixture(scope="session", autouse=True)
+# def use_hash_embeddings():
+#     os.environ["USE_HASH_EMBEDDINGS"] = "1"
+#     yield
+#     os.environ.pop("USE_HASH_EMBEDDINGS", None)
 
 
 @pytest.fixture

@@ -76,9 +76,15 @@ def evaluate_boundary_method(
     method: str,
     classifier: BoundaryClassifier | None = None,
     threshold: float | None = None,
+    feature_builder: PageFeatureBuilder | None = None,
 ) -> dict[str, float]:
-    baseline = BoundaryBaseline(threshold=threshold) if method in {"baseline_rule", "baseline_embedding"} else None
-    feature_builder = PageFeatureBuilder() if method == "learned" else None
+    baseline = (
+        BoundaryBaseline(threshold=threshold, feature_builder=feature_builder)
+        if method in {"baseline_rule", "baseline_embedding"}
+        else None
+    )
+    if method == "learned" and feature_builder is None:
+        feature_builder = PageFeatureBuilder()
 
     boundary_scores: list[tuple[float, float, float]] = []
     grouping_scores: list[float] = []
@@ -133,7 +139,6 @@ def evaluate_boundary_method(
         "streams_evaluated": len(samples),
         "page_pairs_evaluated": page_pairs,
     }
-
 
 def build_training_matrix(
     adapter: DocSplitAdapter,

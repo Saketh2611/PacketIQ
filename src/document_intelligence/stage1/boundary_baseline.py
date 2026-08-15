@@ -31,11 +31,12 @@ class BoundaryBaseline:
         self,
         threshold: float | None = None,
         mode: str = "weighted",
+        feature_builder: PageFeatureBuilder | None = None,
     ) -> None:
         settings = get_settings()
         self.threshold = threshold if threshold is not None else settings.boundary_threshold
         self.mode = mode
-        self.feature_builder = PageFeatureBuilder()
+        self.feature_builder = feature_builder or PageFeatureBuilder()
         self.weights = np.array(
             [
                 settings.semantic_weight,

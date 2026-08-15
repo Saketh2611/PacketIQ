@@ -73,17 +73,18 @@ class BoundaryClassifier:
         y: np.ndarray,
         val_size: float = 0.2,
     ) -> TrainingResult:
-        X_scaled = self.scaler.fit_transform(X)
         X_train, X_val, y_train, y_val = train_test_split(
-            X_scaled,
+            X,
             y,
             test_size=val_size,
             random_state=get_settings().random_seed,
             stratify=y if len(np.unique(y)) > 1 else None,
         )
+        X_train_scaled = self.scaler.fit_transform(X_train)
+        X_val_scaled = self.scaler.transform(X_val)
         self.model = self._create_model()
-        self.model.fit(X_train, y_train)
-        y_pred = self.model.predict(X_val)
+        self.model.fit(X_train_scaled, y_train)
+        y_pred = self.model.predict(X_val_scaled)
         report = classification_report(y_val, y_pred, output_dict=True, zero_division=0)
         return TrainingResult(
             train_size=len(X_train),

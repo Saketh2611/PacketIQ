@@ -22,6 +22,7 @@ from document_intelligence.evaluation.dataset_eval import (
 from document_intelligence.evaluation.resource_metrics import measure_resources
 from document_intelligence.stage1.boundary_classifier import BoundaryClassifier
 from document_intelligence.stage1.page_features import PageFeatureBuilder
+from document_intelligence.stage3.embeddings import EmbeddingModel
 from document_intelligence.utils.timing import timer
 
 
@@ -42,6 +43,8 @@ def run_dataset_stage1_benchmarks(runner: BenchmarkRunner, max_train_streams: in
             "Train/dev source: nutrientdocs/openpss-mirror (OpenPSS community mirror).",
             "Test/eval source: nutrientdocs/doc-split-benchmark (official evaluation slice).",
             "nutrientdocs/doc-split-v2 is referenced by the assignment but was not accessible on HuggingFace Hub.",
+            "Embedding model instance is reused across Stage 1 benchmark phases to avoid repeated model initialization.",
+            "Classifier scaler is fit after the train/validation split using training features only.",
             "Document-type classification accuracy is not reported because these datasets provide boundary labels only.",
         ],
     }
@@ -61,6 +64,9 @@ def run_dataset_stage1_benchmarks(runner: BenchmarkRunner, max_train_streams: in
         test_rows = load_rows(test_adapter, "test")
 
     test_samples = list(iter_stream_samples(test_adapter, test_rows))
+    shared_embedder = EmbeddingModel()
+    test_feature_builder = PageFeatureBuilder(embedder=shared_embedder)
+    train_feature_builder = PageFeatureBuilder(embedder=shared_embedder)
     results["dataset_stats"] = {
         "train_rows": len(train_rows),
         "test_rows": len(test_rows),
@@ -70,11 +76,19 @@ def run_dataset_stage1_benchmarks(runner: BenchmarkRunner, max_train_streams: in
     }
 
     with timer("baseline_rule") as t_rule:
-        results["methods"]["baseline_rule"] = evaluate_boundary_method(test_samples, "baseline_rule")
+        results["methods"]["baseline_rule"] = evaluate_boundary_method(
+            test_samples,
+            "baseline_rule",
+            feature_builder=test_feature_builder,
+        )
     results["methods"]["baseline_rule"]["latency_seconds"] = t_rule.elapsed_seconds
 
     with timer("baseline_embedding") as t_emb:
-        results["methods"]["baseline_embedding"] = evaluate_boundary_method(test_samples, "baseline_embedding")
+        results["methods"]["baseline_embedding"] = evaluate_boundary_method(
+            test_samples,
+            "baseline_embedding",
+            feature_builder=test_feature_builder,
+        )
     results["methods"]["baseline_embedding"]["latency_seconds"] = t_emb.elapsed_seconds
 
     train_stream_rows = train_rows
@@ -88,7 +102,7 @@ def run_dataset_stage1_benchmarks(runner: BenchmarkRunner, max_train_streams: in
         results["dataset_stats"]["train_streams_used_for_classifier"] = len(selected)
 
     with timer("train_classifier") as t_train:
-        X, y = build_training_matrix(train_adapter, train_stream_rows)
+        X, y = build_training_matrix(train_adapter, train_stream_rows, feature_builder=train_feature_builder)
         classifier = BoundaryClassifier()
         train_result = classifier.train(X, y, val_size=0.2)
         model_path = settings.models_dir / "boundary_classifier.joblib"
@@ -103,7 +117,10 @@ def run_dataset_stage1_benchmarks(runner: BenchmarkRunner, max_train_streams: in
 
     with timer("learned_classifier") as t_learned:
         results["methods"]["learned_classifier"] = evaluate_boundary_method(
-            test_samples, "learned", classifier=classifier
+            test_samples,
+            "learned",
+            classifier=classifier,
+            feature_builder=test_feature_builder,
         )
     results["methods"]["learned_classifier"]["latency_seconds"] = t_learned.elapsed_seconds
 
