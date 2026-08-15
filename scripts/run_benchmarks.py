@@ -1,84 +1,124 @@
 #!/usr/bin/env python3
-"""Run complete benchmarks."""
+"""Run benchmarks on real page-stream datasets."""
 
 from __future__ import annotations
 
 import argparse
+import json
 import sys
+from dataclasses import asdict
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "src"))
 
-import numpy as np
-
+from document_intelligence.config.settings import get_settings
+from document_intelligence.dataset.adapter import DocSplitAdapter
 from document_intelligence.evaluation.benchmark import BenchmarkRunner
-from document_intelligence.evaluation.retrieval_metrics import evaluate_retrieval
-from document_intelligence.ingestion.page_extractor import PageRepresentation
-from document_intelligence.pipeline import DocumentIntelligencePipeline
-from document_intelligence.stage1.boundary_baseline import BoundaryBaseline
-from document_intelligence.stage1.grouping import decisions_to_groups
+from document_intelligence.evaluation.dataset_eval import (
+    build_training_matrix,
+    evaluate_boundary_method,
+    iter_stream_samples,
+)
+from document_intelligence.evaluation.resource_metrics import measure_resources
+from document_intelligence.stage1.boundary_classifier import BoundaryClassifier
+from document_intelligence.stage1.page_features import PageFeatureBuilder
 from document_intelligence.utils.timing import timer
 
 
-def create_synthetic_pages() -> list[PageRepresentation]:
-    """Create synthetic pages for benchmark when no PDF available."""
-    pages = []
-    texts = [
-        "INVOICE\nBill To: Acme Corp\nItem: Laptop Qty: 2 Amount: 50000",
-        "INVOICE continued\nSubtotal: 50000\nTax: 2340\nTotal Amount: 52340",
-        "INVOICE page 3\nPayment terms: Net 30",
-        "RESUME\nJohn Doe\nExperience: Software Engineer at Tech Co",
-        "RESUME continued\nEducation: BS Computer Science\nSkills: Python, ML",
-        "PASSPORT\nNationality: Example\nDate of Birth: 1990-01-01",
-    ]
-    for i, text in enumerate(texts, 1):
-        pages.append(
-            PageRepresentation(
-                page_id=f"bench_page_{i:04d}",
-                page_number=i,
-                text=text,
-            )
-        )
-    return pages
+def load_rows(adapter: DocSplitAdapter, split: str) -> list[dict]:
+    ds = adapter.load_dataset(split)
+    return [ds[i] for i in range(len(ds))]
 
 
-def run_stage1_benchmarks(runner: BenchmarkRunner) -> None:
-    pages = create_synthetic_pages()
-    true_groups = [[1, 2, 3], [4, 5], [6]]
-    true_pairs = []
-    page_to_group = {}
-    for gi, g in enumerate(true_groups):
-        for p in g:
-            page_to_group[p] = gi
-    for i in range(len(pages) - 1):
-        a, b = pages[i].page_number, pages[i + 1].page_number
-        is_boundary = page_to_group[a] != page_to_group[b]
-        true_pairs.append((a, b, is_boundary))
-
-    methods = {
-        "baseline_rule": BoundaryBaseline(mode="weighted"),
-        "baseline_embedding": BoundaryBaseline(mode="embedding_only"),
+def run_dataset_stage1_benchmarks(runner: BenchmarkRunner, max_train_streams: int | None = None) -> dict:
+    settings = get_settings()
+    results: dict = {
+        "train_dataset": settings.dataset_name,
+        "train_config": settings.dataset_config,
+        "test_dataset": settings.test_dataset_name,
+        "test_config": settings.test_dataset_config,
+        "methods": {},
+        "notes": [
+            "Train/dev source: nutrientdocs/openpss-mirror (OpenPSS community mirror).",
+            "Test/eval source: nutrientdocs/doc-split-benchmark (official evaluation slice).",
+            "nutrientdocs/doc-split-v2 is referenced by the assignment but was not accessible on HuggingFace Hub.",
+            "Document-type classification accuracy is not reported because these datasets provide boundary labels only.",
+        ],
     }
-    eval_data = {}
-    for name, baseline in methods.items():
-        decisions = baseline.predict_pairs(pages)
-        pred_pairs = [(d.page_a, d.page_b, d.is_boundary) for d in decisions]
-        pred_groups = [g.page_numbers for g in decisions_to_groups(len(pages), decisions, "bench")]
-        eval_data[name] = [
-            {
-                "true_boundary_pairs": true_pairs,
-                "pred_boundary_pairs": pred_pairs,
-                "true_groups": true_groups,
-                "pred_groups": pred_groups,
-                "true_types": ["invoice", "resume", "passport"],
-                "pred_types": ["invoice", "resume", "passport"],
-            }
-        ]
-    results = runner.run_stage1_benchmark(eval_data)
-    print("Stage 1 benchmarks:", results)
+
+    train_adapter = DocSplitAdapter(
+        dataset_name=settings.dataset_name,
+        dataset_config=settings.dataset_config,
+    )
+    test_adapter = DocSplitAdapter(
+        dataset_name=settings.test_dataset_name,
+        dataset_config=settings.test_dataset_config,
+    )
+
+    with timer("load_train") as load_train_t:
+        train_rows = load_rows(train_adapter, "train")
+    with timer("load_test") as load_test_t:
+        test_rows = load_rows(test_adapter, "test")
+
+    test_samples = list(iter_stream_samples(test_adapter, test_rows))
+    results["dataset_stats"] = {
+        "train_rows": len(train_rows),
+        "test_rows": len(test_rows),
+        "test_streams": len(test_samples),
+        "load_train_seconds": load_train_t.elapsed_seconds,
+        "load_test_seconds": load_test_t.elapsed_seconds,
+    }
+
+    with timer("baseline_rule") as t_rule:
+        results["methods"]["baseline_rule"] = evaluate_boundary_method(test_samples, "baseline_rule")
+    results["methods"]["baseline_rule"]["latency_seconds"] = t_rule.elapsed_seconds
+
+    with timer("baseline_embedding") as t_emb:
+        results["methods"]["baseline_embedding"] = evaluate_boundary_method(test_samples, "baseline_embedding")
+    results["methods"]["baseline_embedding"]["latency_seconds"] = t_emb.elapsed_seconds
+
+    train_stream_rows = train_rows
+    if max_train_streams is not None:
+        grouped: dict[str, list[dict]] = {}
+        for row in train_rows:
+            grouped.setdefault(str(row["stream_id"]), []).append(row)
+        selected = list(grouped.keys())[:max_train_streams]
+        train_stream_rows = [row for sid in selected for row in grouped[sid]]
+        results["dataset_stats"]["train_rows_used_for_classifier"] = len(train_stream_rows)
+        results["dataset_stats"]["train_streams_used_for_classifier"] = len(selected)
+
+    with timer("train_classifier") as t_train:
+        X, y = build_training_matrix(train_adapter, train_stream_rows)
+        classifier = BoundaryClassifier()
+        train_result = classifier.train(X, y, val_size=0.2)
+        model_path = settings.models_dir / "boundary_classifier.joblib"
+        classifier.save(model_path)
+    results["classifier_training"] = {
+        "train_size": train_result.train_size,
+        "val_size": train_result.val_size,
+        "model_path": str(model_path),
+        "feature_importance": classifier.feature_importance(),
+        "latency_seconds": t_train.elapsed_seconds,
+    }
+
+    with timer("learned_classifier") as t_learned:
+        results["methods"]["learned_classifier"] = evaluate_boundary_method(
+            test_samples, "learned", classifier=classifier
+        )
+    results["methods"]["learned_classifier"]["latency_seconds"] = t_learned.elapsed_seconds
+
+    results["resources"] = asdict(
+        measure_resources(
+            t_rule.elapsed_seconds + t_emb.elapsed_seconds + t_train.elapsed_seconds + t_learned.elapsed_seconds,
+            model_cache_dir=settings.models_dir,
+        )
+    )
+    runner.save_results("stage1_dataset", results)
+    return results
 
 
-def run_retrieval_benchmark(runner: BenchmarkRunner) -> None:
+def run_retrieval_benchmark(runner: BenchmarkRunner) -> dict:
+    """Retrieval benchmark remains query-set based until a labeled query set exists."""
     queries = [
         {
             "retrieved_ids": ["doc_001_chunk_001", "doc_001_chunk_002"],
@@ -92,17 +132,24 @@ def run_retrieval_benchmark(runner: BenchmarkRunner) -> None:
         },
     ]
     results = runner.run_retrieval_benchmark(queries, indexing_time=1.2)
-    print("Retrieval benchmarks:", results)
+    results["notes"] = [
+        "Retrieval metrics are still based on a small smoke-test query set.",
+        "The page-stream datasets do not provide labeled retrieval queries/evidence pairs.",
+    ]
+    runner.save_results("retrieval", results)
+    return results
 
 
 def main() -> None:
-    parser = argparse.ArgumentParser(description="Run benchmarks")
+    parser = argparse.ArgumentParser(description="Run dataset-backed benchmarks")
     parser.add_argument("--stage", default="all", choices=["all", "stage1", "retrieval"])
+    parser.add_argument("--max-train-streams", type=int, default=None, help="Limit train streams for faster runs")
     args = parser.parse_args()
 
     runner = BenchmarkRunner()
     if args.stage in ("all", "stage1"):
-        run_stage1_benchmarks(runner)
+        results = run_dataset_stage1_benchmarks(runner, max_train_streams=args.max_train_streams)
+        print(json.dumps(results, indent=2, default=str))
     if args.stage in ("all", "retrieval"):
         run_retrieval_benchmark(runner)
     print(f"Results saved to {runner.output_dir}")

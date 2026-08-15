@@ -52,18 +52,22 @@ Structural chunks embedded with Sentence Transformers, stored in FAISS (inner pr
 
 ## 9. Evaluation Methodology
 
-- **Stage 1**: Boundary precision/recall/F1 at page-pair level; page grouping accuracy; classification accuracy
-- **Stage 2**: Provenance correctness, extraction completeness (no fake accuracy without ground truth)
-- **Stage 3**: Recall@k, Precision@k, MRR, nDCG on query/chunk relevance pairs
-- **Resources**: Wall-clock latency, RSS memory, index size
+- **Stage 1**: Macro-averaged boundary precision/recall/F1 and page grouping accuracy **per stream**, evaluated on `nutrientdocs/doc-split-benchmark` (config `our200`, 200 test streams). Classifier trained on `nutrientdocs/openpss-mirror` (config `SHORT`, train split, 40,715 rows).
+- **Stage 2**: Provenance correctness on sample PDF only (datasets lack structured-output ground truth)
+- **Stage 3**: Recall@k, Precision@k, MRR, nDCG on a small smoke-test query set (no labeled queries in page-stream datasets)
+- **Resources**: Wall-clock latency, RSS memory, model size
 
-Train/val/test split by packet ID to prevent leakage.
+Train/eval separation: classifier trained on OpenPSS mirror train; never evaluated on OpenPSS mirror test during benchmark reporting. `doc-split-v2` was referenced in the assignment but was not accessible on HuggingFace Hub; `openpss-mirror` is the verified public training mirror per dataset card.
 
 ## 10. Benchmark Results
 
-[RUN BENCHMARK TO FILL]
+| Method | Boundary F1 | Page Grouping Accuracy |
+|--------|-------------|------------------------|
+| baseline_rule | 0.799 | 0.715 |
+| baseline_embedding | 0.768 | 0.715 |
+| learned_classifier | 0.774 | 0.723 |
 
-Execute: `python scripts/run_benchmarks.py` and `python scripts/generate_sample_outputs.py`
+Run date: 2026-08-15. Hash embedding fallback used. See [benchmark_report.md](benchmark_report.md) for full tables.
 
 ## 11. Failure Analysis
 
@@ -77,9 +81,14 @@ Execute: `python scripts/run_benchmarks.py` and `python scripts/generate_sample_
 
 ## 12. Resource & Performance Analysis
 
-[RUN BENCHMARK TO FILL]
+| Metric | Value |
+|--------|-------|
+| Classifier training time | 342.7 s |
+| Stage 1 eval (3 methods) | ~18 s total |
+| Peak RSS | 7,987 MB (full train feature build) |
+| Saved classifier size | ~1.5 KB |
 
-Defaults target CPU execution. Embedding model ~80MB. Reranker disabled by default. Batch encoding for throughput.
+Defaults target CPU execution. Hash embedding fallback used when Sentence Transformers unavailable. Reranker disabled by default.
 
 ## 13. Trade-offs
 
@@ -89,16 +98,15 @@ Defaults target CPU execution. Embedding model ~80MB. Reranker disabled by defau
 
 ## 14. Future Improvements
 
-- Full OpenPSS mirror training for boundary classifier
+- Re-run benchmarks with Sentence Transformers embeddings (disable hash fallback)
 - PaddleOCR for production OCR
 - Confidence calibration (Platt scaling)
 - Qdrant adapter for distributed deployment
+- Labeled retrieval query set for Stage 3 evaluation
 
 ## 15. AI Usage Declaration
 
 - **AI-assisted code generation**: Implementation scaffolded and refined with Cursor AI coding assistant
-- **Human engineering decisions**: Architecture (3-stage hybrid), feature selection, model choices, evaluation methodology
-- **Experiments performed**: Synthetic benchmark runs, end-to-end sample pipeline on generated PDF
-- **Validation performed**: pytest unit/integration tests, manual sample output verification
-
-*Benchmark numbers on OpenPSS mirror and doc-split-benchmark: [RUN BENCHMARK TO FILL]*
+- **Human engineering decisions**: Architecture (3-stage hybrid), feature selection, model choices, evaluation methodology, dataset role mapping (openpss-mirror vs doc-split-benchmark vs doc-split-v2)
+- **Experiments performed**: Dataset-backed Stage 1 benchmark on 200 test streams; classifier trained on 40,715 OpenPSS mirror rows; end-to-end sample PDF pipeline
+- **Validation performed**: 34 pytest tests (including dataset adapter and eval tests), dataset schema inspection, benchmark JSON artifacts
