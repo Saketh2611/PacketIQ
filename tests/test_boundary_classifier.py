@@ -34,3 +34,13 @@ def test_classifier_save_load(tmp_path):
     d1 = clf.predict_decisions(pairs)
     d2 = clf2.predict_decisions(pairs)
     assert d1[0].is_boundary == d2[0].is_boundary
+    
+def test_predict_decisions_returns_native_types():
+    clf = BoundaryClassifier()
+    X = np.random.rand(10, 9)
+    y = np.array([1] * 5 + [0] * 5)
+    clf.train(X, y)
+    pairs = [PagePairFeatures(page_a_number=1, page_b_number=2, features=X[0])]
+    decisions = clf.predict_decisions(pairs)
+    assert isinstance(decisions[0].is_boundary, bool)  # not numpy.bool_
+    assert isinstance(decisions[0].score, float)        # not numpy.float64

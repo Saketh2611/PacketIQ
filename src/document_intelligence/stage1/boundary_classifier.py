@@ -103,12 +103,13 @@ class BoundaryClassifier:
         probas = self.predict_proba_pairs(pairs)
         decisions: list[BoundaryDecision] = []
         for pair, prob in zip(pairs, probas):
-            is_boundary = prob < self.threshold
+            prob = float(prob)                      # cast numpy.float64 → float
+            is_boundary = bool(prob < self.threshold)  # cast numpy.bool_ → bool
             decisions.append(
                 BoundaryDecision(
                     page_a=pair.page_a_number,
                     page_b=pair.page_b_number,
-                    score=float(prob),
+                    score=prob,
                     is_boundary=is_boundary,
                     method=f"learned_{self.model_type}",
                 )
