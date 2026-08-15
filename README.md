@@ -130,6 +130,12 @@ Three methods are compared:
 | `embedding` | Cosine similarity threshold only |
 | `learned` | Logistic Regression (or XGBoost) on feature vector |
 
+> **`learned` requires a trained model first.** It loads `models/boundary_classifier.joblib`, which is **not** included in the repo (it's gitignored and only produced by training). If that file is missing, the pipeline logs a warning and **silently falls back to `baseline`** — you won't get an error, just baseline-quality results. Train it with:
+> ```bash
+> python scripts/run_benchmarks.py --stage stage1
+> ```
+> This downloads the configured HuggingFace datasets and trains on the full OpenPSS mirror train split (~40k rows), so it needs internet access and a few minutes. Use `--max-train-streams N` to train on a smaller subset for a quick smoke test.
+
 Boundary decisions are converted to contiguous page groups. Each group is classified using heuristic + optional embedding-based classifiers.
 
 ### Stage 2: Structured Document Representation
@@ -216,12 +222,19 @@ python scripts/inspect_dataset.py
 # Compare dataset cards and save relationship report
 python scripts/compare_datasets.py
 
-# Download train manifest (OpenPSS mirror)
-python scripts/download_dataset.py --split train
+# Download both manifests (train -> data/processed/train_manifest.json,
+# test -> data/processed/test_manifest.json), using the datasets configured
+# in .env / configs/config.yaml
+python scripts/download_dataset.py
 
-# Download test manifest (benchmark)
-python scripts/download_dataset.py --dataset nutrientdocs/doc-split-benchmark --config our200 --split test --output data/processed/test_manifest.json
+# Download only the train/dev manifest
+python scripts/download_dataset.py --train-only
+
+# Download only the test/eval manifest
+python scripts/download_dataset.py --test-only
 ```
+
+`download_dataset.py` doesn't take `--dataset`/`--config`/`--output` flags — it always downloads the pair of datasets defined by `DATASET_NAME`/`DATASET_CONFIG` (train) and `TEST_DATASET_NAME`/`TEST_DATASET_CONFIG` (test) in your settings, and always writes to `data/processed/{train,test}_manifest.json`. To point it at different datasets, change those variables in `.env` first.
 
 ---
 
@@ -240,6 +253,8 @@ python -m venv .venv
 pip install -r requirements.txt
 pip install -e .
 ```
+
+> **Note:** `pip install -e .` installs the package in editable mode so `document_intelligence` is importable from anywhere (needed for the API and for `import document_intelligence...` in your own scripts). `pyproject.toml` also declares a `doc-intel` console-script entry point, but the module it points to (`document_intelligence.cli`) doesn't exist yet — use the scripts in `scripts/` (or `python main.py` for a one-line pointer) instead of `doc-intel` for now.
 
 Copy environment template:
 
@@ -280,7 +295,7 @@ Settings load from `.env`, `configs/config.yaml`, and `configs/models.yaml`.
 python scripts/generate_sample_outputs.py
 ```
 
-Outputs land in `outputs/samples/` (stage1 JSON, structured docs, retrieval results).
+This generates a synthetic 6-page packet (invoice + resume + passport), runs all three stages on it, and writes to `outputs/samples/`: a fresh `sample_packet.pdf`, `stage1_output.json`, per-document JSON under `structured/`, `retrieval_output.json`, and `failure_case_empty_query.json`. The repo already ships pre-generated versions of these files as a reference — running this script regenerates and overwrites them, which is a good first command to confirm your install works end to end.
 
 ### Stage 1 — Analyze a PDF packet
 
@@ -291,7 +306,7 @@ python scripts/run_stage1.py \
   --method baseline
 ```
 
-Methods: `baseline` | `embedding` | `learned`
+Methods: `baseline` | `embedding` | `learned` (run `python scripts/run_benchmarks.py --stage stage1` once beforehand to train the model that `--method learned` needs — see the note in [Stage 1](#stage-1-page-pair-boundary-detection))
 
 ### Stage 2 — Structure documents
 
@@ -379,12 +394,12 @@ PacketIQ/
 │   ├── api/              # FastAPI endpoints
 │   └── pipeline.py       # End-to-end orchestrator
 ├── scripts/              # CLI entry points
-├── tests/                # pytest suite (34 tests)
+├── tests/                # pytest suite (36 tests)
 ├── configs/              # config.yaml, models.yaml
 ├── docs/                 # architecture, benchmark, technical reports
 ├── data/                 # raw, processed, indexes
 ├── outputs/              # pipeline outputs, benchmarks, samples
-├── models/               # saved boundary classifier
+├── models/               # saved boundary classifier (created at runtime, gitignored — see below)
 ├── Dockerfile
 ├── docker-compose.yml
 └── requirements.txt
@@ -397,6 +412,8 @@ PacketIQ/
 ```bash
 pytest tests/ -v
 ```
+
+> **First run needs internet.** By default tests use the real `sentence-transformers/all-MiniLM-L6-v2` embedding model, which is downloaded and cached (~90 MB) the first time it's loaded. If you're offline or want faster/deterministic tests, set `USE_HASH_EMBEDDINGS=true` in your environment before running pytest to use a hash-based embedding fallback instead.
 
 Test coverage includes:
 
