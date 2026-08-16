@@ -394,7 +394,7 @@ PacketIQ/
 │   ├── api/              # FastAPI endpoints
 │   └── pipeline.py       # End-to-end orchestrator
 ├── scripts/              # CLI entry points
-├── tests/                # pytest suite (36 tests)
+├── tests/                # pytest suite (39 tests)
 ├── configs/              # config.yaml, models.yaml
 ├── docs/                 # architecture, benchmark, technical reports
 ├── data/                 # raw, processed, indexes

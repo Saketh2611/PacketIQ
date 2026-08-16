@@ -34,8 +34,9 @@ benchmark." Full explanation: [docs/datasets.md](datasets.md).
 ## Stage 1 — Boundary Detection (doc-split-benchmark test, 200 streams, 694 page pairs)
 
 Metrics are macro-averaged per stream on the test set. The classifier was trained on the full
-`openpss-mirror` SHORT train split (32,408 train / 8,103 val pairs) and validated with the scaler fit on
-training features only.
+`openpss-mirror` SHORT train split (32,408 train / 8,103 val pairs) with `class_weight="balanced"` (page
+streams are naturally imbalanced toward same-document pairs, so this reweights the minority boundary class
+during training) and validated with the scaler fit on training features only.
 
 | Method | Boundary Precision | Boundary Recall | Boundary F1 | Page Grouping Accuracy |
 |--------|-------------------|-----------------|-------------|------------------------|

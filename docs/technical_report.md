@@ -66,7 +66,17 @@ Three methods compared:
 - **Baseline A (rule)**: weighted rule/threshold over all 9 features
 - **Baseline B (embedding)**: cosine similarity threshold only
 - **Final (learned)**: Logistic Regression on the full 9-feature vector, trained on 32,408 page-pair
-  examples from `openpss-mirror`
+  examples from `openpss-mirror`, with `class_weight="balanced"` to correct for the natural imbalance
+  between same-document and boundary page pairs in a page-stream dataset (most adjacent pages belong to the
+  same document, so boundaries are the minority class) — without this, the classifier would be biased
+  toward predicting "not a boundary" and recall would suffer.
+
+A second classification path — `EmbeddingDocumentClassifier`, a nearest-prototype classifier over document
+type using the same Sentence Transformer embeddings — was implemented as an alternative to the heuristic
+keyword classifier, but is not currently wired into the pipeline (`DocumentClassifier(use_embedding=False)`
+in `pipeline.py`) because it requires labeled per-type prototype text that the page-stream datasets don't
+provide (they carry boundary labels only, not document-type labels). It remains in the codebase as a
+documented alternative approach — see §14.
 
 ## 7. Stage 2 Method
 
@@ -202,6 +212,12 @@ query: ~1.0s vs. ~0.15–0.31s for subsequent queries in the same run). Figures 
 cold-start cost. This is a one-time process-startup cost that would not recur in a long-lived server
 process.
 
+**Memory measurement caveat:** "peak RSS" above is process RSS sampled once, after the measured work
+completes (`psutil.Process().memory_info().rss` in `resource_metrics.py`) — a snapshot close to the true
+peak for CPU-bound, single-threaded work like this, but not a continuously-tracked maximum. A more precise
+measurement would poll RSS throughout execution or use `resource.getrusage(RUSAGE_SELF).ru_maxrss`, which
+tracks the OS-reported peak directly.
+
 ## 13. Trade-offs
 
 - Heuristic/rule-based boundary detection is fast but meaningfully less accurate than the trained classifier
@@ -236,6 +252,11 @@ process.
 - Confidence calibration (Platt scaling) for the boundary classifier's probability outputs.
 - Qdrant or pgvector adapter for distributed deployment beyond the local FAISS flat index.
 - PaddleOCR as an alternative OCR backend for production scanned-document handling.
+- Activate `EmbeddingDocumentClassifier` (implemented in `stage1/document_classifier.py` but not currently
+  wired into the pipeline) by building type prototypes from a small labeled seed set per document type, then
+  A/B it against the current heuristic keyword classifier on the hidden evaluation set — the heuristic
+  approach works well on clearly-worded documents but is brittle to paraphrasing or non-English text in a
+  way an embedding-based nearest-prototype classifier would not be.
 
 ## 15. AI Usage Declaration
 
