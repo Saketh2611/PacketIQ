@@ -9,14 +9,15 @@ input/output contract and its own measurable success criteria:
 
 1. **Boundary detection & grouping** — given N pages, decide which adjacent pairs are same-document vs.
    different-document, then collapse that into contiguous page groups with a predicted type.
-2. **Structuring** — given a page group, produce a schema-validated representation (title, sections,
-   content blocks, page provenance) suitable for chunking.
+2. **Structuring** — given a page group, produce a schema-validated representation (title, sections, typed
+   content blocks including tables/figures/lists, page provenance) suitable for chunking.
 3. **Retrieval** — given a query, return ranked evidence chunks with document ID, page, and score — not a
    generated answer.
 
-Each stage's output is the next stage's input, so errors compound downstream; this is reflected in how the
-pipeline is benchmarked (each stage evaluated on its own metrics, and Stage 3's evaluation additionally
-depends on Stage 1/2 already being correct on the same sample packet).
+Each stage's output is the next stage's input, so errors compound downstream, and fixes at an earlier stage
+can resolve problems that look like later-stage failures. This showed up directly during development: a
+retrieval failure initially attributed to ranking was actually a Stage 2 chunking problem, and fixing
+chunking resolved it without touching retrieval logic at all (see §11).
 
 ## 2. Overall Approach
 
@@ -38,10 +39,12 @@ Three-stage pipeline: Ingestion → Boundary/Classification → Structure/Chunk 
    avoids depending on an LLM's context window scaling with packet length.
 2. **PyMuPDF native extraction before OCR** — avoids unnecessary rendering and compute; OCR only triggers
    when native text extraction falls below a length threshold.
-3. **Evidence-centric retrieval, with an explicit reranking on/off switch surfaced end-to-end** — returns
-   provenance-linked text chunks rather than generated responses, and lets reranking be toggled per-request
-   (via `use_reranker` on the pipeline, API, and CLI) rather than only at the process/config level, which
-   made the Stage 3 before/after comparison in this report possible without restarting the service.
+3. **Chunking that preserves label-content relationships, not just token windows** — short field labels
+   (e.g. `"Skills:"`) are merged with their immediately following content block during chunking, and
+   multi-row tables/multi-item lists are detected and preserved as single structured chunks rather than
+   split into disconnected paragraph chunks. This was added after benchmarking showed a class of retrieval
+   failures that reranking could not fix because the correct information was never in the same chunk as
+   what the query would naturally match against — see §11.
 
 ## 5. Technology Selection and Alternatives
 
@@ -67,44 +70,46 @@ Three methods compared:
 
 ## 7. Stage 2 Method
 
-Native PDF blocks are grouped into sections using a font-size heading heuristic. Tables are preserved as
-logical chunks. Metadata includes content hashes and extraction method per document. Each structured
-document tracks `page_start`/`page_end` provenance back to the source PDF.
+Native PDF blocks are grouped into sections using a font-size heading heuristic. Consecutive
+column-structured lines are detected and merged into `table` blocks (with parsed headers/rows) rather than
+left as independent paragraph blocks; consecutive bullet/numbered lines are merged into `list` blocks;
+image blocks are captured as `figure` blocks. Each block carries a `metadata` dict with its source bounding
+box for traceability back to the original PDF layout. Each structured document tracks
+`page_start`/`page_end` provenance back to the source PDF.
 
 ## 8. Stage 3 Method
 
 Structural chunks are embedded with Sentence Transformers and stored in FAISS (inner product on normalized
-vectors). Query → embed → top-50 vector search → optional cross-encoder rerank of top-20 → return top-k
-evidence. When reranking is enabled, the final score is a weighted combination of the normalized vector
-score and the normalized cross-encoder score (`combine_scores`, 0.4/0.6 weighting).
+vectors). During chunking, a short label block immediately followed by its content (e.g. `"Skills:"` →
+list of skills) is merged into a single chunk rather than kept as two disconnected chunks, so retrieval can
+match the label semantically while returning the actual content. Query → normalize (empty/whitespace-only
+queries short-circuit with a validation warning, skipping the embed/search entirely) → embed → top-50 vector
+search → optional cross-encoder rerank of top-20 → return top-k evidence. When reranking is enabled, the
+final score is a weighted combination of the normalized vector score and the normalized cross-encoder score.
 
 ## 9. Evaluation Methodology
 
 - **Stage 1**: Macro-averaged boundary precision/recall/F1 and page grouping accuracy **per stream**,
-  evaluated on `nutrientdocs/doc-split-benchmark` (config `our200`, 200 test streams, 694 page pairs).
-  Classifier trained on `nutrientdocs/openpss-mirror` (config `SHORT`, train split, 40,715 rows / 204
-  streams). Train/test are always disjoint datasets — the classifier never sees `doc-split-benchmark`
-  during training, only during evaluation.
-- **Stage 2**: Documents processed, avg sections/blocks per document, and provenance correctness on the
-  sample packet (invoice + resume + passport, 6 pages, 3 documents) via `evaluate_stage2()`. No
-  structured-output ground-truth dataset exists publicly for this task, so this is measured against the
-  bundled sample packet rather than at dataset scale.
-- **Stage 3**: Recall@k, Precision@k, MRR, nDCG on 6 hand-labeled queries (2 per sample document type),
-  each with a `relevant_ids` ground truth verified by inspecting the real extracted chunk text. Run twice —
-  once with the reranker forced off, once forced on — to produce a controlled before/after comparison, since
-  the page-stream datasets used for Stage 1 provide no retrieval query/evidence pairs.
-- **Resources**: wall-clock latency, peak RSS memory, model size, per the fields in
-  `evaluation/resource_metrics.py`.
+  evaluated on `nutrientdocs/doc-split-benchmark` (200 test streams, 694 page pairs). Classifier trained on
+  `nutrientdocs/openpss-mirror` (train split, 40,715 rows). Train/test are always disjoint datasets.
+- **Stage 2**: Documents processed, avg sections/blocks per document, table/figure block counts, and
+  provenance correctness on the sample packet via `evaluate_stage2()`. No structured-output ground-truth
+  dataset exists publicly for this task.
+- **Stage 3**: Recall@k, Precision@k, MRR, nDCG on 6 hand-labeled queries (2 per sample document type).
+  Ground truth (`relevant_ids`) is resolved dynamically by matching expected answer text against the
+  current chunker's output — not hardcoded chunk IDs — so the evaluation stays valid as chunking logic
+  changes, which mattered directly when the chunking fix below changed chunk boundaries and counts (33 →
+  27 total chunks). Run separately with the reranker forced off and forced on for a controlled before/after
+  comparison.
+- **Resources**: wall-clock latency, peak RSS memory, model size.
 
-Dataset roles: `doc-split-v2`, named in the assignment as the development dataset
-(`https://huggingface.co/nutrientdocs/doc-split-v2`), is **not a HuggingFace dataset** — it is a commercial
-model card (Nutrient's proprietary page-stream segmentation model, `nutrient-commercial` license, weights
-not downloadable). Its own model card lists `doc-split-benchmark` as its training/eval data, so there is
-nothing loadable at that URL via `datasets.load_dataset()`. Using it would also conflict with the
-assignment's explicit restriction against models "specifically trained for the DocSplit or DocSplit v2
-benchmark." In its place, `openpss-mirror` (train/dev) and `doc-split-benchmark` (test/eval only, never
-trained on) are used — both real, loadable page-stream segmentation datasets from the same publisher. Full
-explanation: [docs/datasets.md](datasets.md).
+Dataset roles: `doc-split-v2`, named in the assignment as the development dataset, is **not a HuggingFace
+dataset** — it is a commercial model card (Nutrient's proprietary page-stream segmentation model,
+`nutrient-commercial` license, weights not downloadable). Its own model card lists `doc-split-benchmark` as
+its training/eval data. Using it would also conflict with the assignment's explicit restriction against
+models "specifically trained for the DocSplit or DocSplit v2 benchmark." In its place, `openpss-mirror`
+(train/dev) and `doc-split-benchmark` (test/eval only, never trained on) are used. Full explanation:
+[docs/datasets.md](datasets.md).
 
 ## 10. Benchmark Results
 
@@ -116,30 +121,30 @@ explanation: [docs/datasets.md](datasets.md).
 | baseline_embedding | 0.517 | 0.582 |
 | learned_classifier | **0.784** | **0.722** |
 
-Measured 2026-08-16 with real `all-MiniLM-L6-v2` embeddings (not the hash fallback) and the leakage-fixed
-classifier (scaler fit only on training features, after the train/val split). Reproduced independently on a
-second run the same day with matching results to three decimal places.
+Independently reproduced twice on 2026-08-16, matching to four decimal places both times.
 
 ### Stage 2 — Structuring
 
 | Metric | Value |
 |--------|-------|
 | Documents processed | 3 |
-| Avg sections / document | 1.0 |
-| Avg content blocks / document | 11.0 |
+| Avg blocks / document | 10.0 |
+| Table blocks detected | 1 |
 | Provenance correctness | 3 / 3 |
-| Processing time | 0.015 s |
+| Processing time | 0.018 s |
 
-### Stage 3 — Retrieval
+### Stage 3 — Retrieval, before vs. after the chunking fix
 
-| Metric | Vector Only | Vector + Reranker |
-|--------|-------------|-------------------|
-| Top-1 accuracy | 3 / 6 | **4 / 6** |
-| Recall@1 | 0.500 | **0.667** |
-| MRR | 0.589 | **0.708** |
-| nDCG | 0.648 | **0.738** |
+| Metric | Before fix (vector) | After fix (vector) | After fix (+ reranker) |
+|--------|----------------------|----------------------|--------------------------|
+| Top-1 accuracy | 3 / 6 | **5 / 6** | 5 / 6 |
+| Recall@1 | 0.500 | **0.833** | 0.833 |
+| MRR | 0.589 | **0.867** | 0.833 |
+| nDCG | 0.648 | **0.898** | 0.833 |
 
-Full tables and per-query breakdown: [benchmark_report.md](benchmark_report.md).
+The chunking fix produced a larger accuracy gain than the reranker did in the previous benchmark round, and
+resolved a failure the reranker could not. Full tables and per-query breakdown:
+[benchmark_report.md](benchmark_report.md).
 
 ## 11. Failure Analysis
 
@@ -151,73 +156,83 @@ Full tables and per-query breakdown: [benchmark_report.md](benchmark_report.md).
 | Scanned pages | OCR fallback with confidence |
 | Unknown doc type | Explicit `unknown` label |
 | Low boundary confidence | Score retained in output, not discarded |
+| Empty/whitespace query | Short-circuits with `empty_query` warning, no search performed |
 | No retrieval match | Empty results + warning |
 
-### Stage 3 retrieval failure cases (from the 6-query benchmark)
+### Stage 3 retrieval failure cases — root cause and resolution history
 
-- **Fixed by reranking:** "What is the total amount on the invoice?" — vector-only search ranked the bare
-  heading `"INVOICE"` above the actual line `"Total Amount: ₹52,340"`. Cause: `all-MiniLM-L6-v2`'s
-  bi-encoder embeds short, low-information chunks close to many queries in cosine space when the indexed
-  corpus is small (33 chunks here). The cross-encoder reranker, which scores query+chunk pairs jointly
-  rather than comparing independent embeddings, correctly promoted the true answer to rank 1.
-- **Not fixed by reranking:** "What skills does the candidate have?" — both modes return the chunk
-  containing only the heading `"Skills:"` instead of the chunk containing the actual list
-  (`"Python, Machine Learning, FastAPI"`). This is a chunking problem, not a ranking problem: the heading and
-  its content are separate chunks with no strong semantic link, so reranking the same candidate set cannot
-  recover a chunk that was never a close match. Likely fix: merge short headings with their immediately
-  following content block during Stage 2 chunking, rather than one-line-per-block.
-- **Reranking makes one case worse:** "What is the candidate's most recent job title?" — reranking replaces
-  one wrong answer with a different wrong answer (`"Software Engineer"`, a generic title on an unrelated
-  line) that the cross-encoder scored as a closer lexical match to "job title" than the correct chunk
-  (`"Senior Developer at TechCo (2020-2024)"`). This demonstrates reranking is not a strict per-query
-  improvement even though it improves aggregate metrics — worth stating plainly rather than only reporting
-  the aggregate win.
+- **Resolved: "Skills:" chunking failure.** Originally, "What skills does the candidate have?" retrieved
+  only the bare heading chunk `"Skills:"` in both vector-only and reranked modes, because the heading and
+  its content list were separate, disconnected chunks — reranking a candidate set that never contained the
+  right chunk cannot fix a missing candidate. The fix was at Stage 2/chunking, not Stage 3: short label
+  blocks are now merged with their following content block before chunking. After the fix, this query
+  passes in both modes. This is a concrete example of the compounding-errors point in §1 — a stage-1/2
+  problem masquerading as a stage-3 ranking problem.
+- **New/ongoing: reranking regression on "most recent job title."** Vector-only search correctly ranks the
+  true answer (`"Senior Developer at TechCo"`) first. With reranking enabled, that chunk is pushed out of
+  the top 5 entirely, replaced by chunks the cross-encoder judged more lexically similar to "job title"
+  (e.g. a generic "Software Engineer" mention). This is a repeat, more severe instance of a pattern also
+  seen in the previous benchmark round (reranking swapping one wrong answer for another on the same query
+  type) — reranking is not a strict improvement per-query, and specifically underperforms vector-only search
+  on this "most recent role" query type across two independent benchmark rounds. This is a genuine
+  limitation, not a one-off artifact, and is treated as such rather than averaged away in the aggregate
+  metrics.
+- **Not yet tested at scale:** all Stage 3 failure analysis above is on a 6-query hand-labeled set against a
+  3-document sample packet. The chunking fix's effect on Stage 1-scale data (200+ streams) is untested,
+  since Stage 1's dataset provides boundary labels only, not structuring or retrieval ground truth.
 
 ## 12. Resource & Performance Analysis
 
 | Metric | Value |
 |--------|-------|
-| Stage 1 classifier training time | 2,073.6 s (~34.6 min) |
-| Stage 1 total wall clock | 2,128.8 s (~35.5 min) |
-| Stage 1 peak RSS | 6,248 MB |
+| Stage 1 classifier training time | ~2,074–2,123 s (~35 min), two independent runs |
+| Stage 1 peak RSS | 3,644–6,248 MB across runs |
 | Saved classifier size | ~1.5 KB |
-| Stage 2 processing time (3 docs) | 0.015 s |
-| Stage 3 indexing time (33 chunks) | ~13 s |
-| Stage 3 query latency, warm, no reranker | ~0.022 s |
-| Stage 3 query latency, warm, with reranker | ~0.13–0.26 s |
+| Stage 2 processing time (3 docs) | 0.018 s |
+| Stage 3 indexing time (27 chunks) | 13.5–14.7 s |
+| Stage 3 query latency, warm, no reranker | ~0.02–0.03 s |
+| Stage 3 query latency, warm, with reranker | ~0.15–0.31 s |
 
-All defaults target CPU execution. Real Sentence Transformer embeddings used throughout (not the hash
-fallback). Reranker disabled by default (`USE_RERANKER=false`), enabled per-request via `use_reranker`.
+All defaults target CPU execution. Real Sentence Transformer embeddings used throughout. Reranker disabled
+by default (`USE_RERANKER=false`), enabled per-request via `use_reranker`.
 
-**Measurement caveat:** both the embedding model and the cross-encoder reranker load lazily on first use.
-The first query in a fresh process therefore reports inflated `latency_seconds` that reflects model loading,
-not retrieval cost — the reranked run's first query showed 9.6s while subsequent queries in the same run
-were 0.13–0.26s. The "warm" figures above exclude that first-query cost. This is a one-time process-startup
-cost, not a per-query cost, and would not recur in a long-lived server process (e.g. the FastAPI app, which
-constructs the pipeline once at startup).
+**Measurement caveat, still applicable:** both the embedding model and the cross-encoder reranker load
+lazily on first use in a fresh process, inflating the first query's reported latency (reranked run's first
+query: ~1.0s vs. ~0.15–0.31s for subsequent queries in the same run). Figures above exclude first-query
+cold-start cost. This is a one-time process-startup cost that would not recur in a long-lived server
+process.
 
 ## 13. Trade-offs
 
 - Heuristic/rule-based boundary detection is fast but meaningfully less accurate than the trained classifier
-  (F1 0.533 vs. 0.784) — the accuracy gain from training justified the added complexity of a train/eval
-  split and model artifact.
-- Flat FAISS index is simple and sufficient at this scale (33 chunks in the sample packet) but doesn't
-  scale to millions of chunks without an ANN index or a managed vector database.
-- Reranking improves aggregate retrieval quality (Top-1 3/6 → 4/6, MRR 0.589 → 0.708) but roughly 6–12×
-  increases warm per-query latency (0.022s → 0.13–0.26s) and does not fix chunking-rooted failures — a
-  deliberate trade of latency for accuracy, exposed as an opt-in flag rather than baked in, so callers can
-  choose per request.
-- Basic table extraction (native PDF blocks) vs. a dedicated table-structure model — kept simple since the
-  target document types (invoices, resumes, passports) have limited tabular complexity in the sample data.
+  (F1 0.533 vs. 0.784).
+- Flat FAISS index is simple and sufficient at this scale but doesn't scale to millions of chunks without
+  an ANN index or managed vector database.
+- **Chunking that merges labels with content trades chunk granularity for retrievability** — a merged chunk
+  is less atomic and slightly larger, but is far more likely to actually contain the answer to a natural
+  question about that field. This traded some chunk-size uniformity for a measurable accuracy gain (Top-1
+  3/6 → 5/6).
+- **Reranking is not applied unconditionally** — given the demonstrated regression on "most recent role"
+  style queries across two benchmark rounds, defaulting reranking to off and exposing it as an explicit
+  per-request flag (rather than always-on) was the safer choice; a production system might want reranking
+  enabled only for query types empirically shown to benefit (numeric/entity lookups), which the two rounds
+  of benchmarking here start to distinguish.
+- Basic table extraction (structural pattern-matching on column-like spacing) vs. a dedicated
+  table-structure model — kept simple since the target document types have limited tabular complexity in
+  the sample data, though this is now schema-aware (`table` blocks with real `headers`/`rows`) rather than
+  flattened to paragraph text.
 
 ## 14. Future Improvements
 
-- Fix the resume "Skills:" chunking failure by merging short headings with their following content block
-  during Stage 2 chunking, rather than treating every block as an independent chunk.
-- Expand the Stage 3 labeled query set beyond 6 queries (more per document type, plus adversarial/no-answer
-  queries) for a more statistically stable Recall@k/MRR estimate.
-- Wire `--stage stage2` into `scripts/run_benchmarks.py`'s CLI so all three stages run from one command
-  instead of three separate scripts.
+- Investigate why reranking specifically hurts "most recent role/title"-style queries across two benchmark
+  rounds — likely a cross-encoder lexical-similarity bias toward any job-title-shaped text regardless of
+  recency, which the model has no explicit signal for; consider a recency-aware re-ranking feature or
+  excluding this query archetype from the reranking path.
+- Expand the Stage 3 labeled query set beyond 6 queries for a more statistically stable Recall@k/MRR
+  estimate, and to determine whether the reranking regression generalizes beyond this one query pattern.
+- Extend the chunking fix's label-merging logic to a broader class of "heading + content" patterns beyond
+  the current short-label heuristic, and validate it doesn't over-merge on documents with legitimately
+  short but complete field values.
 - Confidence calibration (Platt scaling) for the boundary classifier's probability outputs.
 - Qdrant or pgvector adapter for distributed deployment beyond the local FAISS flat index.
 - PaddleOCR as an alternative OCR backend for production scanned-document handling.
@@ -225,24 +240,24 @@ constructs the pipeline once at startup).
 ## 15. AI Usage Declaration
 
 - **AI-assisted code generation and debugging**: Implementation scaffolded and refined with an AI coding
-  assistant (Claude), used interactively across the project — including diagnosing and fixing two real
-  bugs found during benchmarking: (1) `Reranker.enabled` was not being overridden by the per-request
-  `use_reranker` flag, so requesting reranking silently had no effect until `EvidenceRetriever.retrieve()`
-  was patched to temporarily flip `Reranker.enabled` before calling `rerank()`; (2) `pipeline.query()` did
-  not forward `use_reranker`/`document_type` to the retriever at all, and the `/retrieve` API endpoint
-  accepted but silently dropped both fields from its request schema.
-- **Human engineering decisions**: Architecture (3-stage hybrid), feature selection, model choices,
-  evaluation methodology, dataset role mapping (`openpss-mirror` vs. `doc-split-benchmark` vs.
-  `doc-split-v2`), the decision to hand-label a real Stage 3 query set rather than continue reporting a
-  fabricated smoke test, and the interpretation of the reranker before/after results (including the
-  decision to report the case where reranking made a result worse, rather than only the aggregate
-  improvement).
-- **Experiments performed**: Dataset-backed Stage 1 benchmark on 200 test streams (reproduced twice with
-  matching results); classifier trained on 40,715 OpenPSS mirror rows; real Stage 2 structuring benchmark
-  on the sample packet; real Stage 3 retrieval benchmark on 6 hand-labeled queries, run both with and
-  without reranking for a controlled comparison.
-- **Validation performed**: 36 pytest tests (including dataset adapter and eval tests), dataset schema
-  inspection, benchmark JSON artifacts, manual verification of the `doc-split-v2` HuggingFace page content
-  to correct an earlier inaccurate claim that it "was not accessible" (it loads fine — it's a commercial
-  model card, not a dataset), and hand-verification of Stage 3 ground-truth chunk IDs against the actual
-  extracted text in `outputs/samples/structured/*.json`.
+  assistant (Claude), used interactively throughout — including diagnosing two retrieval-wiring bugs
+  (`Reranker.enabled` not respecting the per-request `use_reranker` override; `pipeline.query()` and the
+  `/retrieve` API endpoint silently dropping `use_reranker`/`document_type` instead of forwarding them), and
+  correctly diagnosing that an initial "Skills:" retrieval failure was a Stage 2 chunking problem rather
+  than a Stage 3 ranking problem — which directed the fix to the right layer instead of over-tuning
+  reranking to compensate for a missing chunk.
+- **Human engineering decisions**: architecture (3-stage hybrid), feature selection, model choices,
+  evaluation methodology, dataset role mapping, the decision to hand-label a real Stage 3 query set instead
+  of a fabricated smoke test, the decision to resolve ground truth dynamically against chunker output rather
+  than hardcoding chunk IDs (so evaluation survives chunking changes), the specific chunking fix (merge
+  short labels with following content; detect tables/lists structurally), and the interpretation of the
+  reranking regression as a genuine, reportable limitation rather than noise to average away.
+- **Experiments performed**: Stage 1 dataset benchmark on 200 test streams, reproduced twice with matching
+  results; Stage 2 structuring benchmark on the sample packet, before and after the chunking fix; Stage 3
+  retrieval benchmark on 6 hand-labeled queries, run with and without reranking, both before and after the
+  chunking fix — four total retrieval configurations compared.
+- **Validation performed**: dataset schema inspection, benchmark JSON artifacts, manual verification of the
+  `doc-split-v2` HuggingFace page content (it is a commercial model card, not a dataset — corrected from an
+  earlier inaccurate claim that it was inaccessible), hand-verification of Stage 3 answer-text-based ground
+  truth against real chunk content, and independent re-derivation of the reported MRR/Recall@1 figures from
+  raw per-query results to confirm the evaluation code computed them correctly.

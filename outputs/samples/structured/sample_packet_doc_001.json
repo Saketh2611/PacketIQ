@@ -21,7 +21,16 @@
             "page": 1,
             "headers": null,
             "rows": null,
-            "items": null
+            "items": null,
+            "metadata": {
+              "bbox": [
+                72.0,
+                60.17499923706055,
+                117.23199462890625,
+                75.28900146484375
+              ],
+              "source_block_type": "text"
+            }
           },
           {
             "type": "paragraph",
@@ -29,7 +38,16 @@
             "page": 1,
             "headers": null,
             "rows": null,
-            "items": null
+            "items": null,
+            "metadata": {
+              "bbox": [
+                72.0,
+                90.40303039550781,
+                197.3119659423828,
+                105.51702880859375
+              ],
+              "source_block_type": "text"
+            }
           },
           {
             "type": "paragraph",
@@ -37,7 +55,16 @@
             "page": 1,
             "headers": null,
             "rows": null,
-            "items": null
+            "items": null,
+            "metadata": {
+              "bbox": [
+                72.0,
+                105.51704406738281,
+                149.6489715576172,
+                120.63104248046875
+              ],
+              "source_block_type": "text"
+            }
           },
           {
             "type": "paragraph",
@@ -45,7 +72,16 @@
             "page": 1,
             "headers": null,
             "rows": null,
-            "items": null
+            "items": null,
+            "metadata": {
+              "bbox": [
+                72.0,
+                135.7450714111328,
+                184.49696350097656,
+                150.85906982421875
+              ],
+              "source_block_type": "text"
+            }
           },
           {
             "type": "paragraph",
@@ -53,7 +89,16 @@
             "page": 1,
             "headers": null,
             "rows": null,
-            "items": null
+            "items": null,
+            "metadata": {
+              "bbox": [
+                72.0,
+                150.8590850830078,
+                157.60195922851562,
+                165.97308349609375
+              ],
+              "source_block_type": "text"
+            }
           },
           {
             "type": "paragraph",
@@ -61,31 +106,48 @@
             "page": 2,
             "headers": null,
             "rows": null,
-            "items": null
+            "items": null,
+            "metadata": {
+              "bbox": [
+                72.0,
+                60.17499923706055,
+                175.31198120117188,
+                75.28900146484375
+              ],
+              "source_block_type": "text"
+            }
           },
           {
-            "type": "paragraph",
-            "text": "Item          Qty    Amount",
+            "type": "table",
+            "text": "Item | Qty | Amount\nLaptop | 2 | 50000\nMouse | 5 | 500",
             "page": 2,
-            "headers": null,
-            "rows": null,
-            "items": null
-          },
-          {
-            "type": "paragraph",
-            "text": "Laptop         2     50000",
-            "page": 2,
-            "headers": null,
-            "rows": null,
-            "items": null
-          },
-          {
-            "type": "paragraph",
-            "text": "Mouse          5       500",
-            "page": 2,
-            "headers": null,
-            "rows": null,
-            "items": null
+            "headers": [
+              "Item",
+              "Qty",
+              "Amount"
+            ],
+            "rows": [
+              [
+                "Laptop",
+                "2",
+                "50000"
+              ],
+              [
+                "Mouse",
+                "5",
+                "500"
+              ]
+            ],
+            "items": null,
+            "metadata": {
+              "bbox": [
+                72.0,
+                90.40303039550781,
+                191.22897338867188,
+                135.74505615234375
+              ],
+              "source_block_count": 3
+            }
           },
           {
             "type": "paragraph",
@@ -93,7 +155,16 @@
             "page": 2,
             "headers": null,
             "rows": null,
-            "items": null
+            "items": null,
+            "metadata": {
+              "bbox": [
+                72.0,
+                150.8590850830078,
+                149.0549774169922,
+                165.97308349609375
+              ],
+              "source_block_type": "text"
+            }
           },
           {
             "type": "paragraph",
@@ -101,7 +172,16 @@
             "page": 3,
             "headers": null,
             "rows": null,
-            "items": null
+            "items": null,
+            "metadata": {
+              "bbox": [
+                72.0,
+                60.17499923706055,
+                175.31198120117188,
+                75.28900146484375
+              ],
+              "source_block_type": "text"
+            }
           },
           {
             "type": "paragraph",
@@ -109,7 +189,16 @@
             "page": 3,
             "headers": null,
             "rows": null,
-            "items": null
+            "items": null,
+            "metadata": {
+              "bbox": [
+                72.0,
+                90.40303039550781,
+                147.19598388671875,
+                105.51702880859375
+              ],
+              "source_block_type": "text"
+            }
           },
           {
             "type": "paragraph",
@@ -117,7 +206,16 @@
             "page": 3,
             "headers": null,
             "rows": null,
-            "items": null
+            "items": null,
+            "metadata": {
+              "bbox": [
+                72.0,
+                105.51704406738281,
+                180.22897338867188,
+                120.63104248046875
+              ],
+              "source_block_type": "text"
+            }
           },
           {
             "type": "paragraph",
@@ -125,7 +223,16 @@
             "page": 3,
             "headers": null,
             "rows": null,
-            "items": null
+            "items": null,
+            "metadata": {
+              "bbox": [
+                72.0,
+                135.7450714111328,
+                214.43896484375,
+                150.85906982421875
+              ],
+              "source_block_type": "text"
+            }
           }
         ]
       }
@@ -140,7 +247,7 @@
     "page_end": 3,
     "page_count": 3,
     "extraction_method": "native",
-    "processing_timestamp": "2026-08-16T07:34:40.367331+00:00",
+    "processing_timestamp": "2026-08-16T10:07:07.367125+00:00",
     "content_hash": "3242e93978d6ccdd",
     "model_versions": {
       "embedding": "sentence-transformers/all-MiniLM-L6-v2"

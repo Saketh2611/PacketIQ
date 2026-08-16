@@ -1,0 +1,130 @@
+{
+  "metrics": {
+    "recall_at_1": 0.8333333333333334,
+    "recall_at_3": 0.8333333333333334,
+    "recall_at_5": 0.8333333333333334,
+    "precision_at_1": 0.8333333333333334,
+    "precision_at_5": 0.16666666666666666,
+    "mrr": 0.8333333333333334,
+    "ndcg": 0.8333333333333334,
+    "avg_latency_seconds": 0.35832055000355467,
+    "indexing_time_seconds": 13.53603839999414
+  },
+  "resources": {
+    "wall_clock_seconds": 0.0007168999873101711,
+    "peak_rss_mb": 622.71484375,
+    "cpu_percent": 67.1,
+    "model_size_mb": null,
+    "index_size_mb": null
+  },
+  "output_name": "stage3_reranker",
+  "use_reranker": true,
+  "per_query": [
+    {
+      "query": "What is the total amount on the invoice?",
+      "document_type": "invoice",
+      "match_text": "Total Amount",
+      "relevant_ids": [
+        "sample_packet_doc_001_chunk_011"
+      ],
+      "retrieved_ids": [
+        "sample_packet_doc_001_chunk_011",
+        "sample_packet_doc_001_chunk_004",
+        "sample_packet_doc_001_chunk_001",
+        "sample_packet_doc_001_chunk_009",
+        "sample_packet_doc_001_chunk_006"
+      ],
+      "top1_correct": true,
+      "latency_seconds": 1.0081300000019837
+    },
+    {
+      "query": "What is the invoice number?",
+      "document_type": "invoice",
+      "match_text": "Invoice #INV-2024-001",
+      "relevant_ids": [
+        "sample_packet_doc_001_chunk_004"
+      ],
+      "retrieved_ids": [
+        "sample_packet_doc_001_chunk_004",
+        "sample_packet_doc_001_chunk_001",
+        "sample_packet_doc_001_chunk_009",
+        "sample_packet_doc_001_chunk_006",
+        "sample_packet_doc_001_chunk_008"
+      ],
+      "top1_correct": true,
+      "latency_seconds": 0.24720900002284907
+    },
+    {
+      "query": "What skills does the candidate have?",
+      "document_type": "resume",
+      "match_text": "Python, Machine Learning, FastAPI",
+      "relevant_ids": [
+        "sample_packet_doc_002_chunk_007"
+      ],
+      "retrieved_ids": [
+        "sample_packet_doc_002_chunk_007",
+        "sample_packet_doc_002_chunk_003",
+        "sample_packet_doc_003_chunk_002",
+        "sample_packet_doc_002_chunk_005",
+        "sample_packet_doc_002_chunk_002"
+      ],
+      "top1_correct": true,
+      "latency_seconds": 0.3146594999998342
+    },
+    {
+      "query": "What is the candidate's most recent job title?",
+      "document_type": "resume",
+      "match_text": "Senior Developer at TechCo",
+      "relevant_ids": [
+        "sample_packet_doc_002_chunk_004"
+      ],
+      "retrieved_ids": [
+        "sample_packet_doc_002_chunk_003",
+        "sample_packet_doc_002_chunk_005",
+        "sample_packet_doc_002_chunk_002",
+        "sample_packet_doc_001_chunk_005",
+        "sample_packet_doc_003_chunk_001"
+      ],
+      "top1_correct": false,
+      "latency_seconds": 0.22286499998881482
+    },
+    {
+      "query": "What is the passport holder's date of birth?",
+      "document_type": "passport",
+      "match_text": "Date of Birth: 01 JAN 1990",
+      "relevant_ids": [
+        "sample_packet_doc_003_chunk_008"
+      ],
+      "retrieved_ids": [
+        "sample_packet_doc_003_chunk_008",
+        "sample_packet_doc_001_chunk_005",
+        "sample_packet_doc_003_chunk_001",
+        "sample_packet_doc_003_chunk_004",
+        "sample_packet_doc_001_chunk_008"
+      ],
+      "top1_correct": true,
+      "latency_seconds": 0.20191060000797734
+    },
+    {
+      "query": "What is the passport number?",
+      "document_type": "passport",
+      "match_text": "Passport No: AB1234567",
+      "relevant_ids": [
+        "sample_packet_doc_003_chunk_004"
+      ],
+      "retrieved_ids": [
+        "sample_packet_doc_003_chunk_004",
+        "sample_packet_doc_003_chunk_001",
+        "sample_packet_doc_001_chunk_008",
+        "sample_packet_doc_003_chunk_003",
+        "sample_packet_doc_001_chunk_005"
+      ],
+      "top1_correct": true,
+      "latency_seconds": 0.15514919999986887
+    }
+  ],
+  "notes": [
+    "Ground-truth relevant_ids are resolved from answer text patterns verified against outputs/samples/structured/*.json content, not sourced from a labeled dataset.",
+    "6 queries across all 3 sample document types (invoice, resume, passport)."
+  ]
+}

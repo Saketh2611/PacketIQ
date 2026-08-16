@@ -1,22 +1,10 @@
 #!/usr/bin/env python3
 """Run a real Stage 3 retrieval benchmark against the sample PDF packet.
 
-scripts/run_benchmarks.py's "retrieval" stage scores a hardcoded, fabricated
-list of retrieved_ids/relevant_ids that never touches your actual index or
-pipeline. This script instead:
-
-  1. Builds the sample packet's index (same as scripts/build_index.py)
-  2. Runs a small set of real queries through the real pipeline
-  3. Compares the real returned chunk_ids against hand-labeled ground-truth
-     chunk_ids (verified against outputs/samples/structured/*.json)
-  4. Scores with the same evaluate_retrieval() used elsewhere in this repo
-
-Ground truth was built by inspecting the actual structured chunks in
-outputs/samples/structured/*.json — see GROUND_TRUTH below. Add more
-query -> relevant_chunk_ids pairs there to broaden coverage.
-
-Run with --use-reranker / --no-reranker to compare both retrieval modes,
-same flags as scripts/query.py.
+The benchmark builds the sample packet index, runs labeled queries through the
+real retrieval pipeline, and scores returned chunk_ids against answer text
+patterns resolved from the current Stage 2 chunker output. The page-stream
+datasets used for Stage 1 do not provide retrieval query/evidence labels.
 """
 
 from __future__ import annotations
@@ -31,37 +19,123 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "src"))
 from document_intelligence.config.settings import get_settings
 from document_intelligence.evaluation.benchmark import BenchmarkRunner
 from document_intelligence.pipeline import DocumentIntelligencePipeline
-from document_intelligence.stage2.schema import StructuredDocument
+from document_intelligence.stage2.schema import Chunk, StructuredDocument
 from document_intelligence.utils.io import read_json
 
-# Query -> set of chunk_ids that count as a correct/relevant answer.
-# Verified by hand against outputs/samples/structured/*.json content.
+
 GROUND_TRUTH: list[dict] = [
     {
         "query": "What is the total amount on the invoice?",
-        "relevant_ids": ["sample_packet_doc_001_chunk_013"],  # "Total Amount: ₹52,340"
+        "document_type": "invoice",
+        "match_text": "Total Amount",
     },
     {
         "query": "What is the invoice number?",
-        "relevant_ids": ["sample_packet_doc_001_chunk_004"],  # "Invoice #INV-2024-001"
+        "document_type": "invoice",
+        "match_text": "Invoice #INV-2024-001",
     },
     {
         "query": "What skills does the candidate have?",
-        "relevant_ids": ["sample_packet_doc_002_chunk_011"],  # "Python, Machine Learning, FastAPI"
+        "document_type": "resume",
+        "match_text": "Python, Machine Learning, FastAPI",
     },
     {
         "query": "What is the candidate's most recent job title?",
-        "relevant_ids": ["sample_packet_doc_002_chunk_005"],  # "Senior Developer at TechCo (2020-2024)"
+        "document_type": "resume",
+        "match_text": "Senior Developer at TechCo",
     },
     {
         "query": "What is the passport holder's date of birth?",
-        "relevant_ids": ["sample_packet_doc_003_chunk_008"],  # "Date of Birth: 01 JAN 1990"
+        "document_type": "passport",
+        "match_text": "Date of Birth: 01 JAN 1990",
     },
     {
         "query": "What is the passport number?",
-        "relevant_ids": ["sample_packet_doc_003_chunk_004"],  # "Passport No: AB1234567"
+        "document_type": "passport",
+        "match_text": "Passport No: AB1234567",
     },
 ]
+
+
+def _result_name(use_reranker: bool | None) -> str:
+    if use_reranker is True:
+        return "stage3_reranker"
+    if use_reranker is False:
+        return "stage3_vector"
+    return "stage3"
+
+
+def _resolve_relevant_ids(chunks: list[Chunk], item: dict) -> list[str]:
+    match_text = item["match_text"].lower()
+    doc_type = item["document_type"]
+    matches = [
+        chunk.chunk_id
+        for chunk in chunks
+        if chunk.document_type == doc_type and match_text in chunk.text.lower()
+    ]
+    if not matches:
+        raise ValueError(f"No relevant chunk matched {item['match_text']!r} for query {item['query']!r}")
+    return matches
+
+
+def run_stage3_real_benchmark(
+    runner: BenchmarkRunner | None = None,
+    use_reranker: bool | None = None,
+    top_k: int = 5,
+) -> dict:
+    settings = get_settings()
+    structured_dir = settings.outputs_dir / "samples" / "structured"
+    docs = [StructuredDocument(**read_json(path)) for path in sorted(structured_dir.glob("*.json"))]
+    if not docs:
+        raise FileNotFoundError(
+            f"No structured documents found in {structured_dir}. Run scripts/generate_sample_outputs.py first."
+        )
+
+    pipeline = DocumentIntelligencePipeline()
+    chunks = [chunk for doc in docs for chunk in pipeline.chunker.chunk_document(doc)]
+
+    print(f"Building index from {len(docs)} structured documents ...")
+    index_stats = pipeline.build_index(docs)
+
+    print(f"Running {len(GROUND_TRUTH)} labeled queries (use_reranker={use_reranker}) ...")
+    per_query_results = []
+    eval_queries = []
+    for item in GROUND_TRUTH:
+        relevant_ids = _resolve_relevant_ids(chunks, item)
+        result = pipeline.query(item["query"], top_k=top_k, use_reranker=use_reranker)
+        retrieved_ids = [r["chunk_id"] for r in result["results"]]
+        per_query_results.append(
+            {
+                "query": item["query"],
+                "document_type": item["document_type"],
+                "match_text": item["match_text"],
+                "relevant_ids": relevant_ids,
+                "retrieved_ids": retrieved_ids,
+                "top1_correct": bool(retrieved_ids) and retrieved_ids[0] in relevant_ids,
+                "latency_seconds": result["latency_seconds"],
+            }
+        )
+        eval_queries.append(
+            {
+                "retrieved_ids": retrieved_ids,
+                "relevant_ids": relevant_ids,
+                "latency": result["latency_seconds"],
+            }
+        )
+
+    runner = runner or BenchmarkRunner()
+    metrics_results = runner.run_retrieval_benchmark(eval_queries, indexing_time=index_stats["indexing_time_seconds"])
+    output_name = _result_name(use_reranker)
+    metrics_results["output_name"] = output_name
+    metrics_results["use_reranker"] = use_reranker
+    metrics_results["per_query"] = per_query_results
+    metrics_results["notes"] = [
+        "Ground-truth relevant_ids are resolved from answer text patterns verified against "
+        "outputs/samples/structured/*.json content, not sourced from a labeled dataset.",
+        f"{len(GROUND_TRUTH)} queries across all 3 sample document types (invoice, resume, passport).",
+    ]
+    runner.save_results(output_name, metrics_results)
+    return metrics_results
 
 
 def main() -> None:
@@ -82,62 +156,22 @@ def main() -> None:
     parser.add_argument("--top-k", type=int, default=5)
     args = parser.parse_args()
 
-    settings = get_settings()
-    structured_dir = settings.outputs_dir / "samples" / "structured"
-    docs = [StructuredDocument(**read_json(f)) for f in sorted(structured_dir.glob("*.json"))]
-    if not docs:
-        print(f"No structured documents found in {structured_dir}. Run scripts/generate_sample_outputs.py first.")
+    try:
+        metrics_results = run_stage3_real_benchmark(use_reranker=args.use_reranker, top_k=args.top_k)
+    except (FileNotFoundError, ValueError) as exc:
+        print(str(exc))
         sys.exit(1)
 
-    pipeline = DocumentIntelligencePipeline()
-
-    print(f"Building index from {len(docs)} structured documents ...")
-    index_stats = pipeline.build_index(docs)
-
-    print(f"Running {len(GROUND_TRUTH)} labeled queries (use_reranker={args.use_reranker}) ...")
-    per_query_results = []
-    eval_queries = []
-    for item in GROUND_TRUTH:
-        result = pipeline.query(item["query"], top_k=args.top_k, use_reranker=args.use_reranker)
-        retrieved_ids = [r["chunk_id"] for r in result["results"]]
-        per_query_results.append(
-            {
-                "query": item["query"],
-                "relevant_ids": item["relevant_ids"],
-                "retrieved_ids": retrieved_ids,
-                "top1_correct": bool(retrieved_ids) and retrieved_ids[0] in item["relevant_ids"],
-                "latency_seconds": result["latency_seconds"],
-            }
-        )
-        eval_queries.append(
-            {
-                "retrieved_ids": retrieved_ids,
-                "relevant_ids": item["relevant_ids"],
-                "latency": result["latency_seconds"],
-            }
-        )
-
-    runner = BenchmarkRunner()
-    metrics_results = runner.run_retrieval_benchmark(eval_queries, indexing_time=index_stats["indexing_time_seconds"])
-    metrics_results["use_reranker"] = args.use_reranker
-    metrics_results["per_query"] = per_query_results
-    metrics_results["notes"] = [
-        "Ground-truth relevant_ids were hand-labeled against outputs/samples/structured/*.json "
-        "content, not sourced from a labeled dataset (the page-stream datasets provide boundary "
-        "labels only, no retrieval query/evidence pairs).",
-        f"{len(GROUND_TRUTH)} queries across all 3 sample document types (invoice, resume, passport).",
-    ]
-    runner.save_results("retrieval_real", metrics_results)
-
     print(json.dumps(metrics_results, indent=2, default=str))
-    print(f"\nResults saved to {runner.output_dir / 'retrieval_real.json'}")
+    output_name = metrics_results["output_name"]
+    print(f"\nResults saved to {BenchmarkRunner().output_dir / f'{output_name}.json'}")
 
-    correct = sum(1 for r in per_query_results if r["top1_correct"])
-    print(f"\nTop-1 accuracy: {correct}/{len(per_query_results)}")
-    for r in per_query_results:
-        status = "OK" if r["top1_correct"] else "MISS"
-        top1 = r["retrieved_ids"][0] if r["retrieved_ids"] else "(none)"
-        print(f"  [{status}] {r['query']!r} -> top1={top1}")
+    correct = sum(1 for result in metrics_results["per_query"] if result["top1_correct"])
+    print(f"\nTop-1 accuracy: {correct}/{len(metrics_results['per_query'])}")
+    for result in metrics_results["per_query"]:
+        status = "OK" if result["top1_correct"] else "MISS"
+        top1 = result["retrieved_ids"][0] if result["retrieved_ids"] else "(none)"
+        print(f"  [{status}] {result['query']!r} -> top1={top1}")
 
 
 if __name__ == "__main__":

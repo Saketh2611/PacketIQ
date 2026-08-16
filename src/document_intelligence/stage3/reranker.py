@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import os
 from typing import Any
 
 from document_intelligence.config.settings import get_settings
@@ -10,6 +11,20 @@ from document_intelligence.stage3.vector_store import VectorRecord
 from document_intelligence.utils.logging import get_logger
 
 logger = get_logger(__name__)
+TRUE_VALUES = {"1", "true", "yes", "on"}
+FALSE_VALUES = {"0", "false", "no", "off"}
+
+
+def _env_flag(name: str, default: bool) -> bool:
+    value = os.getenv(name)
+    if value is None:
+        return default
+    normalized = value.strip().lower()
+    if normalized in TRUE_VALUES:
+        return True
+    if normalized in FALSE_VALUES:
+        return False
+    return default
 
 
 class Reranker:
@@ -20,11 +35,17 @@ class Reranker:
         model_name: str | None = None,
         enabled: bool | None = None,
         batch_size: int = 16,
+        local_files_only: bool | None = None,
     ) -> None:
         settings = get_settings()
         self.model_name = model_name or settings.reranker_model
         self.enabled = enabled if enabled is not None else settings.use_reranker
         self.batch_size = batch_size
+        self.local_files_only = (
+            local_files_only
+            if local_files_only is not None
+            else _env_flag("RERANKER_LOCAL_FILES_ONLY", True)
+        )
         self._model: Any = None
 
     def _load(self) -> None:
@@ -32,8 +53,8 @@ class Reranker:
             return
         from sentence_transformers import CrossEncoder
 
-        logger.info("Loading reranker", model=self.model_name)
-        self._model = CrossEncoder(self.model_name)
+        logger.info("Loading reranker", model=self.model_name, local_files_only=self.local_files_only)
+        self._model = CrossEncoder(self.model_name, local_files_only=self.local_files_only)
 
     def rerank(
         self,

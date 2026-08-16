@@ -1,12 +1,15 @@
 # Benchmark Report
 
-> **Canonical run.** Stage 1 measured **2026-08-16** via `python scripts/run_benchmarks.py --stage stage1`.
-> Stage 2 measured the same day via `python scripts/run_stage2_benchmark.py`.
-> Stage 3 measured the same day via `python scripts/run_stage3_benchmark.py --no-reranker` and `--use-reranker`.
+> **Canonical run.** Stage 1 measured **2026-08-16** via `python scripts/run_benchmarks.py --stage stage1`
+> (reproduced twice independently, matching to 3 decimal places both times).
+> Stage 2/3 measured the same day via `run_stage2_benchmark.py` / `run_stage3_benchmark.py --no-reranker` /
+> `--use-reranker`, **after** a chunking fix (see "Chunking fix" below) that merges short field labels
+> (e.g. `"Skills:"`) with their following content block, and adds table/figure detection to Stage 2
+> structuring. All Stage 2/3 numbers below reflect the fixed chunker, not the earlier run.
 > Embeddings: `sentence-transformers/all-MiniLM-L6-v2` with `USE_HASH_EMBEDDINGS=false` (real transformer
-> embeddings, not the hash fallback). Reranker: `cross-encoder/ms-marco-MiniLM-L-6-v2`.
-> Leakage fix applied: the Stage 1 classifier's `StandardScaler` is fit only on the training split, after
-> the train/validation split, not before.
+> embeddings). Reranker: `cross-encoder/ms-marco-MiniLM-L-6-v2`.
+> Leakage fix (Stage 1): the classifier's `StandardScaler` is fit only on the training split, after the
+> train/validation split, not before.
 
 ## Dataset Roles
 
@@ -19,16 +22,14 @@
 **Relationship:** `openpss-mirror` is a public redistribution of the OpenPSS page-stream segmentation
 benchmark for training/experimentation. `doc-split-benchmark` is the official evaluation slice behind the
 leaderboard — used here only as a held-out test set, never for fitting the classifier. They share the same
-page-stream schema (`stream_id`, `position`, boundary label, text, image) but use different field names
-(`label`/`text` vs `boundary`/`page_text`).
+page-stream schema (`stream_id`, `position`, boundary label, text, image) but use different field names.
 
 `doc-split-v2` (`https://huggingface.co/nutrientdocs/doc-split-v2`) is **not a HuggingFace dataset** — it's
 a commercial, non-downloadable model (Nutrient's proprietary page-stream segmenter, license
 `nutrient-commercial`). Its own model card lists `doc-split-benchmark` as its training/eval data, and there
 is nothing to load from that URL via `datasets.load_dataset()`. Using it would also directly conflict with
-the assignment's restriction against "models or checkpoints specifically trained for the DocSplit or
-DocSplit v2 benchmark" — so excluding it satisfies the rules, not just a practical necessity. Full
-explanation: [docs/datasets.md](datasets.md).
+the assignment's restriction against models "specifically trained for the DocSplit or DocSplit v2
+benchmark." Full explanation: [docs/datasets.md](datasets.md).
 
 ## Stage 1 — Boundary Detection (doc-split-benchmark test, 200 streams, 694 page pairs)
 
@@ -44,117 +45,122 @@ training features only.
 
 | Metric | Value |
 |--------|-------|
-| Classification Accuracy | N/A (datasets provide boundary labels only) |
 | Classifier train pairs | 32,408 train / 8,103 val |
-| Classifier training time (s) | 2,073.6 |
-| Total Stage 1 wall clock (s) | 2,128.8 |
-| Peak memory (MB) | 6,248.0 |
+| Classifier training time (s) | ~2,074–2,123 (two runs) |
+| Total Stage 1 wall clock (s) | ~2,129–2,179 (two runs) |
 | Model size (MB) | 0.0015 |
+
+**Reproducibility:** re-run independently twice on 2026-08-16 with matching F1 (0.7838, 0.7838) and
+page-grouping accuracy (0.7223, 0.7223) to four decimal places, confirming the result is stable.
 
 ### Top Feature Importances
 
 | Feature | Weight |
 |---------|--------|
-| token_jaccard | 0.686 |
-| type_agreement | 0.309 |
+| token_jaccard | 0.683–0.686 |
+| type_agreement | 0.307–0.309 |
 | text_length_ratio | 0.112 |
 | structural_similarity | 0.112 |
 | entity_overlap | -0.107 |
 | semantic_cosine | -0.090 |
 
-**Reproducibility:** re-run on 2026-08-16 independently of the run this table was originally built from;
-F1 and page-grouping accuracy matched to three decimal places (0.784 / 0.722 both times), confirming the
-result is stable given the fixed `random_seed`.
-
 ## Stage 2 — Document Structuring (sample packet, 3 documents)
 
-Run via `python scripts/run_stage2_benchmark.py`, which calls the previously-unused `evaluate_stage2()`
-function against the real pipeline output on the bundled sample packet (invoice + resume + passport, 6
-pages).
+Run via `python scripts/run_stage2_benchmark.py`. Post-chunking-fix, Stage 2 now also detects and reports
+tables and figures as distinct block types instead of flattening everything to paragraphs.
 
-| Metric | Value |
-|--------|-------|
-| Documents Processed | 3 |
-| Avg Sections per Document | 1.0 |
-| Avg Content Blocks per Document | 11.0 |
-| Provenance Correctness | 3 / 3 |
-| Processing Time (s) | 0.015 |
+| Metric | Before chunking fix | After chunking fix |
+|--------|---------------------|---------------------|
+| Documents Processed | 3 | 3 |
+| Avg Blocks per Document | 11.0 | 10.0 |
+| Table Blocks | *(not tracked)* | 1 |
+| Figure Blocks | *(not tracked)* | 0 |
+| Provenance Correctness | 3 / 3 | 3 / 3 |
+| Processing Time (s) | 0.015 | 0.018 |
 
-*The page-stream datasets do not provide Stage 2 structured-output ground truth (they're page streams with
-boundary labels only, not annotated document structure), so this is measured against the bundled sample
-packet rather than a labeled dataset — same scope as Stage 1's page-grouping evaluation would need if a
-structuring-labeled dataset existed.*
+*The page-stream datasets do not provide Stage 2 structured-output ground truth, so this is measured
+against the bundled sample packet rather than a labeled dataset.*
 
 ## Stage 3 — Evidence Retrieval (sample packet, 6 hand-labeled queries)
 
-Run via `python scripts/run_stage3_benchmark.py`, which replaces the earlier fabricated 2-query smoke test
-with 6 real queries against the real pipeline output — two per sample document type (invoice, resume,
-passport). Ground truth (`relevant_ids`) was hand-labeled by inspecting the actual extracted chunk text in
-`outputs/samples/structured/*.json`.
+Run via `run_stage3_benchmark.py --no-reranker` / `--use-reranker`. Ground truth (`relevant_ids`) is now
+resolved dynamically by matching answer text patterns against the current chunker's output, so it stays
+correct even as chunk boundaries change — rather than hardcoded chunk IDs that would silently go stale.
 
-| Metric | Vector Only | Vector + Reranker |
-|--------|-------------|-------------------|
-| Top-1 Accuracy | 3 / 6 | **4 / 6** |
-| Recall@1 | 0.500 | **0.667** |
-| Recall@3 | 0.667 | 0.667 |
-| Recall@5 | 0.833 | 0.833 |
-| Precision@1 | 0.500 | **0.667** |
-| Precision@5 | 0.167 | 0.167 |
-| MRR | 0.589 | **0.708** |
-| nDCG | 0.648 | **0.738** |
-| Avg latency (post-warmup, s) | ~0.022 | ~0.18 |
-| Indexing time (s) | 13.05 | 13.52 |
+### Before vs. after the chunking fix
 
-*Latency note: the reported `avg_latency_seconds` for the reranked run (1.75s) is skewed by one-time
-cross-encoder model loading on the first query (9.62s) — every subsequent query in the same run was
-0.13–0.26s. The "post-warmup" figures above use queries 2–6 only, which is the honest per-query cost once
-the model is resident in memory. The same caveat previously applied to embedding-model load time inside
-`latency_seconds`; both are one-time process-startup costs, not steady-state query cost.*
+| Metric | Before fix (vector only) | After fix (vector only) | After fix (+ reranker) |
+|--------|---------------------------|--------------------------|--------------------------|
+| Top-1 Accuracy | 3 / 6 | **5 / 6** | 5 / 6 |
+| Recall@1 | 0.500 | **0.833** | 0.833 |
+| Recall@5 | 0.833 | **1.000** | 0.833 |
+| MRR | 0.589 | **0.867** | 0.833 |
+| nDCG | 0.648 | **0.898** | 0.833 |
+| Indexing time (s) | 13.05 | 14.65 | 13.54 |
 
-### Per-query results
+**The chunking fix — not the reranker — is what fixed the "Skills:" failure.** Merging short field labels
+with their following content block at chunk-build time means the query "What skills does the candidate
+have?" now matches a chunk that actually contains `"Python, Machine Learning, FastAPI"` instead of only the
+bare heading `"Skills:"`. This confirms the diagnosis from the previous benchmark round: that failure was a
+chunk-boundary problem, and no amount of reranking a bad candidate set could have fixed it — only fixing the
+chunking itself could, and it did.
 
-| Query | Doc type | No reranker | With reranker |
+**One remaining failure, present in both modes:** "What is the candidate's most recent job title?" still
+misses in both vector-only and reranked runs — vector-only ranks `chunk_004` ("Software Engineer") above the
+correct `chunk_004`/`Senior Developer` chunk at position 1 incorrectly; **with reranking, the correct chunk
+does not appear in the top 5 at all**, a regression from the vector-only run where it was at least present.
+See failure analysis below.
+
+### Per-query results (vector only vs. reranker)
+
+| Query | Doc type | Vector only | + Reranker |
 |---|---|---|---|
-| "What is the total amount on the invoice?" | invoice | ❌ MISS (`chunk_001`, "INVOICE") | ✅ OK (`chunk_013`, correct) |
+| "What is the total amount on the invoice?" | invoice | ❌ MISS (rank 5) | ✅ OK |
 | "What is the invoice number?" | invoice | ✅ OK | ✅ OK |
-| "What skills does the candidate have?" | resume | ❌ MISS (`chunk_010`, "Skills:") | ❌ MISS (`chunk_010`, "Skills:") |
-| "What is the candidate's most recent job title?" | resume | ❌ MISS (`chunk_007`) | ❌ MISS (`chunk_003`, "Software Engineer") |
+| "What skills does the candidate have?" | resume | ✅ OK | ✅ OK |
+| "What is the candidate's most recent job title?" | resume | ✅ OK | ❌ MISS (not in top 5) |
 | "What is the passport holder's date of birth?" | passport | ✅ OK | ✅ OK |
 | "What is the passport number?" | passport | ✅ OK | ✅ OK |
 
 ### Failure analysis
 
-- **Fixed by reranking:** "total amount on the invoice" — vector search ranked the bare heading `"INVOICE"`
-  above the actual total `"Total Amount: ₹52,340"`, because `all-MiniLM-L6-v2`'s bi-encoder embeds short,
-  low-information chunks close to many queries in cosine space when the corpus is small. The cross-encoder
-  reranker scores query+chunk pairs jointly instead of comparing independent embeddings, and correctly
-  promoted the true answer to rank 1.
-- **Not fixed by reranking — resume "Skills:" query:** both modes return `chunk_010` (the bare heading
-  `"Skills:"`) instead of `chunk_011` (`"Python, Machine Learning, FastAPI"`, the actual list). Root cause is
-  structural, not a ranking failure: the heading and its content ended up as separate chunks with no strong
-  semantic link between them, so no amount of re-ranking the same candidate set recovers the missing chunk if
-  it isn't a strong enough match to begin with. A structural fix — merging short headings with their
-  immediately following content block, or chunking by section instead of one-line-per-block for
-  resume-style content — would likely help; reranking alone cannot fix a bad chunk boundary.
-- **Reranker makes one case worse:** for "most recent job title," reranking replaces one wrong answer
-  (`chunk_007`) with a different wrong answer (`chunk_003`, "Software Engineer" — a generic title on an
-  unrelated line) that the cross-encoder judged a closer lexical match to "job title." This shows reranking
-  is not a strict per-query improvement even though it improves the aggregate metrics above — it's a
-  re-ranking of already-retrieved candidates, so it can't recover a missing correct chunk, and it can
-  occasionally promote a more superficially relevant wrong one.
+- **Fixed by the chunking change:** "Skills:" query — see above. This was previously documented as a
+  reranking-cannot-fix-this case; it's now resolved at the source.
+- **Reranking regression on "most recent job title":** vector-only search correctly ranks the true answer
+  (`"Senior Developer at TechCo"`) at position 1. With reranking enabled, that chunk drops out of the top 5
+  entirely, replaced by generic-title chunks the cross-encoder scored as closer lexical matches to "job
+  title" (e.g. "Software Engineer"). This is a clearer, more concerning version of the same pattern seen in
+  the previous benchmark round: the reranker can demote a correct, already-well-ranked result in favor of a
+  more superficially relevant one. Given this and the previous round's similar finding, reranking should be
+  treated as a targeted improvement for specific query types (e.g. numeric/entity lookups like "total
+  amount," "invoice number," "passport number" — all pass in both modes) rather than a universal win, and
+  this query type ("most recent role/title") is a case where it currently hurts more than it helps.
+- **Indexing time increased slightly** (13.05s → 14.65s) post-fix, consistent with slightly more complex
+  per-block metadata (bounding boxes, merged-label tracking) being computed during structuring/chunking.
+
+### Operational note
+
+The sample packet used for this Stage 2/3 run was generated by an earlier successful
+`generate_sample_outputs.py` run; a later regeneration attempt in the same session failed with a file
+permission error (the output PDF was likely still open in another process/viewer). The benchmark scripts
+ran successfully against the existing on-disk sample packet regardless, so the numbers above are valid, but
+worth closing any PDF viewer before regenerating samples to avoid the same error.
 
 ## Comparison Summary
 
-- **Stage 1:** `learned_classifier` is the strongest boundary-detection method, F1 0.784, reproducible across
-  independent runs with the fixed seed.
-- **Stage 2:** structuring completes correctly on all 3 sample documents with full page-range provenance;
-  no structured-output ground-truth dataset exists to benchmark against at scale.
-- **Stage 3:** reranking improved Top-1 accuracy from 3/6 to 4/6 and MRR from 0.589 to 0.708, but did not
-  fix two resume-related failures rooted in chunk boundaries rather than ranking — see failure analysis
-  above. This is a more defensible result than a single "reranking helps" claim, since it also documents
-  where reranking specifically does not help.
+- **Stage 1:** `learned_classifier` remains the strongest boundary-detection method, F1 0.784, independently
+  reproduced twice with matching results.
+- **Stage 2:** structuring now correctly detects tables and figures as distinct block types (1 table
+  detected in the sample invoice) in addition to full provenance correctness (3/3).
+- **Stage 3:** the chunking fix (merging short labels with following content) resolved the previously
+  documented "Skills:" failure and improved Top-1 accuracy from 3/6 to 5/6 on vector search alone — a larger
+  and more durable gain than reranking provided in isolation. Reranking on top of the fixed chunker holds
+  Top-1 at 5/6 but trades one correct answer for a different one, net neutral on this query set and actively
+  worse on the "job title" query specifically. This suggests prioritizing chunking-quality fixes over
+  reranking tuning going forward, and treating reranking as query-type-dependent rather than a blanket
+  improvement.
 
 Raw results: `outputs/benchmarks/stage1_dataset.json`, `outputs/benchmarks/stage2.json`,
-`outputs/benchmarks/retrieval_real.json`
+`outputs/benchmarks/stage3_vector.json`, `outputs/benchmarks/stage3_reranker.json`
 
 Dataset relationship report: `data/processed/dataset_relationship_report.json`

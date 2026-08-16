@@ -1,0 +1,20 @@
+{
+  "metrics": {
+    "recall_at_1": 0.8333333333333334,
+    "recall_at_3": 0.8333333333333334,
+    "recall_at_5": 0.8333333333333334,
+    "precision_at_1": 0.8333333333333334,
+    "precision_at_5": 0.16666666666666666,
+    "mrr": 0.8333333333333334,
+    "ndcg": 0.8333333333333334,
+    "avg_latency_seconds": 0.35832055000355467,
+    "indexing_time_seconds": 13.53603839999414
+  },
+  "resources": {
+    "wall_clock_seconds": 0.0007168999873101711,
+    "peak_rss_mb": 622.71484375,
+    "cpu_percent": 67.1,
+    "model_size_mb": null,
+    "index_size_mb": null
+  }
+}

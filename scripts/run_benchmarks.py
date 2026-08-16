@@ -24,6 +24,8 @@ from document_intelligence.stage1.boundary_classifier import BoundaryClassifier
 from document_intelligence.stage1.page_features import PageFeatureBuilder
 from document_intelligence.stage3.embeddings import EmbeddingModel
 from document_intelligence.utils.timing import timer
+from run_stage2_benchmark import run_stage2_sample_benchmark
+from run_stage3_benchmark import run_stage3_real_benchmark
 
 
 def load_rows(adapter: DocSplitAdapter, split: str) -> list[dict]:
@@ -134,41 +136,57 @@ def run_dataset_stage1_benchmarks(runner: BenchmarkRunner, max_train_streams: in
     return results
 
 
-def run_retrieval_benchmark(runner: BenchmarkRunner) -> dict:
-    """Retrieval benchmark remains query-set based until a labeled query set exists."""
-    queries = [
-        {
-            "retrieved_ids": ["doc_001_chunk_001", "doc_001_chunk_002"],
-            "relevant_ids": ["doc_001_chunk_002"],
-            "latency": 0.05,
-        },
-        {
-            "retrieved_ids": ["doc_002_chunk_001"],
-            "relevant_ids": ["doc_002_chunk_001"],
-            "latency": 0.03,
-        },
-    ]
-    results = runner.run_retrieval_benchmark(queries, indexing_time=1.2)
-    results["notes"] = [
-        "Retrieval metrics are still based on a small smoke-test query set.",
-        "The page-stream datasets do not provide labeled retrieval queries/evidence pairs.",
-    ]
-    runner.save_results("retrieval", results)
-    return results
+def _stage3_modes(stage3_mode: str, use_reranker: bool | None) -> list[bool | None]:
+    if use_reranker is not None:
+        return [use_reranker]
+    if stage3_mode == "both":
+        return [False, True]
+    if stage3_mode == "vector":
+        return [False]
+    if stage3_mode == "reranker":
+        return [True]
+    return [None]
 
 
 def main() -> None:
     parser = argparse.ArgumentParser(description="Run dataset-backed benchmarks")
-    parser.add_argument("--stage", default="all", choices=["all", "stage1", "retrieval"])
+    parser.add_argument("--stage", default="all", choices=["all", "stage1", "stage2", "stage3", "retrieval"])
     parser.add_argument("--max-train-streams", type=int, default=None, help="Limit train streams for faster runs")
+    parser.add_argument("--top-k", type=int, default=5, help="Stage 3 retrieval depth")
+    parser.add_argument(
+        "--stage3-mode",
+        default="both",
+        choices=["config", "vector", "reranker", "both"],
+        help="Stage 3 reranker mode. Ignored when --use-reranker/--no-reranker is set.",
+    )
+    parser.add_argument(
+        "--use-reranker",
+        dest="use_reranker",
+        action="store_true",
+        default=None,
+        help="Force the Stage 3 reranker on",
+    )
+    parser.add_argument(
+        "--no-reranker",
+        dest="use_reranker",
+        action="store_false",
+        help="Force the Stage 3 reranker off",
+    )
     args = parser.parse_args()
 
     runner = BenchmarkRunner()
+    summary: dict[str, dict] = {}
     if args.stage in ("all", "stage1"):
-        results = run_dataset_stage1_benchmarks(runner, max_train_streams=args.max_train_streams)
-        print(json.dumps(results, indent=2, default=str))
-    if args.stage in ("all", "retrieval"):
-        run_retrieval_benchmark(runner)
+        summary["stage1"] = run_dataset_stage1_benchmarks(runner, max_train_streams=args.max_train_streams)
+    if args.stage in ("all", "stage2"):
+        summary["stage2"] = run_stage2_sample_benchmark(runner)
+    if args.stage in ("all", "stage3", "retrieval"):
+        stage3_results: dict[str, dict] = {}
+        for mode in _stage3_modes(args.stage3_mode, args.use_reranker):
+            result = run_stage3_real_benchmark(runner, use_reranker=mode, top_k=args.top_k)
+            stage3_results[result["output_name"]] = result
+        summary["stage3"] = stage3_results
+    print(json.dumps(summary, indent=2, default=str))
     print(f"Results saved to {runner.output_dir}")
 
 

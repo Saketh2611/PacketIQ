@@ -66,8 +66,24 @@ class PageExtractor:
         blocks: list[TextBlock] = []
         text_parts: list[str] = []
 
+        image_blocks = 0
         for block in raw_blocks:
-            if block.get("type") != 0:
+            block_type = block.get("type")
+            if block_type == 1:
+                image_blocks += 1
+                bbox = block.get("bbox", [0, 0, 0, 0])
+                blocks.append(
+                    TextBlock(
+                        text=f"Figure {image_blocks}",
+                        x0=bbox[0],
+                        y0=bbox[1],
+                        x1=bbox[2],
+                        y1=bbox[3],
+                        block_type="image",
+                    )
+                )
+                continue
+            if block_type != 0:
                 continue
             for line in block.get("lines", []):
                 line_text = ""
@@ -95,6 +111,7 @@ class PageExtractor:
 
         text = "\n".join(text_parts)
         image_list = page.get_images(full=True)
+        image_count = max(len(image_list), image_blocks)
 
         rep = PageRepresentation(
             page_id=page_id,
@@ -103,7 +120,7 @@ class PageExtractor:
             blocks=blocks,
             width=rect.width,
             height=rect.height,
-            image_count=len(image_list),
+            image_count=image_count,
             extraction_method="native",
             metadata={"rotation": page.rotation},
         )

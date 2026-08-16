@@ -39,6 +39,13 @@ data/indexes/*
 !data/indexes/.gitkeep
 outputs/*
 !outputs/samples/
+!outputs/samples/**
+!outputs/benchmarks/
+!outputs/benchmarks/stage1_dataset.json
+!outputs/benchmarks/stage2.json
+!outputs/benchmarks/stage3_vector.json
+!outputs/benchmarks/stage3_reranker.json
+!outputs/benchmarks/stage3.json
 !outputs/.gitkeep
 
 *.pkl

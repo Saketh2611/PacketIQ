@@ -12,6 +12,8 @@ class Stage2Metrics:
     documents_processed: int
     avg_sections_per_doc: float
     avg_blocks_per_doc: float
+    table_blocks: int
+    figure_blocks: int
     provenance_correct: int
     provenance_total: int
     processing_time_seconds: float
@@ -24,6 +26,8 @@ def evaluate_stage2(
 ) -> Stage2Metrics:
     sections = [len(d.content.sections) for d in documents]
     blocks = [sum(len(s.blocks) for s in d.content.sections) for d in documents]
+    table_blocks = sum(1 for d in documents for s in d.content.sections for b in s.blocks if b.type == "table")
+    figure_blocks = sum(1 for d in documents for s in d.content.sections for b in s.blocks if b.type == "figure")
     prov_ok = 0
     for d in documents:
         if d.source.page_start <= d.source.page_end and d.metadata.page_count > 0:
@@ -33,6 +37,8 @@ def evaluate_stage2(
         documents_processed=len(documents),
         avg_sections_per_doc=sum(sections) / len(sections) if sections else 0.0,
         avg_blocks_per_doc=sum(blocks) / len(blocks) if blocks else 0.0,
+        table_blocks=table_blocks,
+        figure_blocks=figure_blocks,
         provenance_correct=prov_ok,
         provenance_total=len(documents),
         processing_time_seconds=processing_time,

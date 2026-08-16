@@ -19,20 +19,17 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "src"))
 
-from dataclasses import asdict
-
 from document_intelligence.config.settings import get_settings
 from document_intelligence.evaluation.benchmark import BenchmarkRunner
 from document_intelligence.pipeline import DocumentIntelligencePipeline
 from document_intelligence.utils.timing import timer
 
 
-def main() -> None:
+def run_stage2_sample_benchmark(runner: BenchmarkRunner | None = None) -> dict:
     settings = get_settings()
     pdf_path = settings.outputs_dir / "samples" / "sample_packet.pdf"
     if not pdf_path.exists():
-        print(f"Sample packet not found at {pdf_path}. Run scripts/generate_sample_outputs.py first.")
-        sys.exit(1)
+        raise FileNotFoundError(f"Sample packet not found at {pdf_path}. Run scripts/generate_sample_outputs.py first.")
 
     pipeline = DocumentIntelligencePipeline()
 
@@ -43,7 +40,7 @@ def main() -> None:
     with timer("stage2_structuring") as t:
         structured_docs = pipeline.run_stage2(stage1, pdf_path)
 
-    runner = BenchmarkRunner()
+    runner = runner or BenchmarkRunner()
     results = runner.run_stage2_benchmark(structured_docs, t.elapsed_seconds)
     results["source_pdf"] = str(pdf_path)
     results["documents"] = [
@@ -58,9 +55,18 @@ def main() -> None:
         for d in structured_docs
     ]
     runner.save_results("stage2", results)
+    return results
+
+
+def main() -> None:
+    try:
+        results = run_stage2_sample_benchmark()
+    except FileNotFoundError as exc:
+        print(str(exc))
+        sys.exit(1)
 
     print(json.dumps(results, indent=2, default=str))
-    print(f"\nResults saved to {runner.output_dir / 'stage2.json'}")
+    print(f"\nResults saved to {BenchmarkRunner().output_dir / 'stage2.json'}")
 
 
 if __name__ == "__main__":

@@ -46,3 +46,13 @@ def test_retrieval_ranking():
     response = retriever.retrieve("What is the total amount on the invoice?", top_k=1)
     assert len(response.results) >= 1
     assert response.results[0].document_type == "invoice"
+
+
+def test_empty_query_returns_validation_warning_without_search():
+    retriever = EvidenceRetriever(FAISSVectorStore())
+
+    response = retriever.retrieve("   ")
+
+    assert response.query == ""
+    assert response.results == []
+    assert response.warnings == ["empty_query"]

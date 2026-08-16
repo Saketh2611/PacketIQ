@@ -58,6 +58,9 @@ class EvidenceRetriever:
         top_k = top_k or self.top_k
         query = self.normalize_query(query)
         warnings: list[str] = []
+        if not query:
+            warnings.append("empty_query")
+            return RetrievalResponse(query=query, results=[], latency_seconds=0.0, warnings=warnings)
 
         with timer("retrieval") as t:
             query_vec = self.embedder.encode([query])[0]

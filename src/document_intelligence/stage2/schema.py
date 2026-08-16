@@ -22,6 +22,7 @@ class ContentBlock(BaseModel):
     headers: list[str] | None = None
     rows: list[list[str]] | None = None
     items: list[str] | None = None
+    metadata: dict[str, Any] = Field(default_factory=dict)
 
 
 class Section(BaseModel):

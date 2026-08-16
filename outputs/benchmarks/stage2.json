@@ -1,0 +1,47 @@
+{
+  "metrics": {
+    "documents_processed": 3,
+    "avg_sections_per_doc": 1.0,
+    "avg_blocks_per_doc": 10.0,
+    "table_blocks": 1,
+    "figure_blocks": 0,
+    "provenance_correct": 3,
+    "provenance_total": 3,
+    "processing_time_seconds": 0.018482099985703826,
+    "warnings_count": 0
+  },
+  "resources": {
+    "wall_clock_seconds": 8.269998943433166e-05,
+    "peak_rss_mb": 616.30859375,
+    "cpu_percent": 75.3,
+    "model_size_mb": null,
+    "index_size_mb": null
+  },
+  "source_pdf": "C:\\Users\\v.saketh\\Desktop\\PacketIQ\\outputs\\samples\\sample_packet.pdf",
+  "documents": [
+    {
+      "document_id": "sample_packet_doc_001",
+      "document_type": "invoice",
+      "confidence": 1.0,
+      "page_start": 1,
+      "page_end": 3,
+      "sections": 1
+    },
+    {
+      "document_id": "sample_packet_doc_002",
+      "document_type": "resume",
+      "confidence": 1.0,
+      "page_start": 4,
+      "page_end": 5,
+      "sections": 1
+    },
+    {
+      "document_id": "sample_packet_doc_003",
+      "document_type": "passport",
+      "confidence": 0.75,
+      "page_start": 6,
+      "page_end": 6,
+      "sections": 1
+    }
+  ]
+}

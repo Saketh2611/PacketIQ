@@ -21,7 +21,16 @@
             "page": 6,
             "headers": null,
             "rows": null,
-            "items": null
+            "items": null,
+            "metadata": {
+              "bbox": [
+                72.0,
+                60.17499923706055,
+                131.90599060058594,
+                75.28900146484375
+              ],
+              "source_block_type": "text"
+            }
           },
           {
             "type": "paragraph",
@@ -29,7 +38,16 @@
             "page": 6,
             "headers": null,
             "rows": null,
-            "items": null
+            "items": null,
+            "metadata": {
+              "bbox": [
+                72.0,
+                90.40303039550781,
+                109.90599060058594,
+                105.51702880859375
+              ],
+              "source_block_type": "text"
+            }
           },
           {
             "type": "paragraph",
@@ -37,7 +55,16 @@
             "page": 6,
             "headers": null,
             "rows": null,
-            "items": null
+            "items": null,
+            "metadata": {
+              "bbox": [
+                72.0,
+                105.51704406738281,
+                167.9860076904297,
+                120.63104248046875
+              ],
+              "source_block_type": "text"
+            }
           },
           {
             "type": "paragraph",
@@ -45,7 +72,16 @@
             "page": 6,
             "headers": null,
             "rows": null,
-            "items": null
+            "items": null,
+            "metadata": {
+              "bbox": [
+                72.0,
+                120.63105773925781,
+                196.1239776611328,
+                135.74505615234375
+              ],
+              "source_block_type": "text"
+            }
           },
           {
             "type": "paragraph",
@@ -53,7 +89,16 @@
             "page": 6,
             "headers": null,
             "rows": null,
-            "items": null
+            "items": null,
+            "metadata": {
+              "bbox": [
+                72.0,
+                150.8590850830078,
+                146.57998657226562,
+                165.97308349609375
+              ],
+              "source_block_type": "text"
+            }
           },
           {
             "type": "paragraph",
@@ -61,7 +106,16 @@
             "page": 6,
             "headers": null,
             "rows": null,
-            "items": null
+            "items": null,
+            "metadata": {
+              "bbox": [
+                72.0,
+                165.9730987548828,
+                174.68499755859375,
+                181.08709716796875
+              ],
+              "source_block_type": "text"
+            }
           },
           {
             "type": "paragraph",
@@ -69,7 +123,16 @@
             "page": 6,
             "headers": null,
             "rows": null,
-            "items": null
+            "items": null,
+            "metadata": {
+              "bbox": [
+                72.0,
+                181.0871124267578,
+                181.42800903320312,
+                196.20111083984375
+              ],
+              "source_block_type": "text"
+            }
           },
           {
             "type": "paragraph",
@@ -77,7 +140,16 @@
             "page": 6,
             "headers": null,
             "rows": null,
-            "items": null
+            "items": null,
+            "metadata": {
+              "bbox": [
+                72.0,
+                196.2011260986328,
+                202.844970703125,
+                211.31512451171875
+              ],
+              "source_block_type": "text"
+            }
           }
         ]
       }
@@ -92,7 +164,7 @@
     "page_end": 6,
     "page_count": 1,
     "extraction_method": "native",
-    "processing_timestamp": "2026-08-16T07:34:40.369359+00:00",
+    "processing_timestamp": "2026-08-16T10:07:07.368117+00:00",
     "content_hash": "9c660ea2b3b8796d",
     "model_versions": {
       "embedding": "sentence-transformers/all-MiniLM-L6-v2"

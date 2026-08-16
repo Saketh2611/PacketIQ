@@ -21,7 +21,16 @@
             "page": 4,
             "headers": null,
             "rows": null,
-            "items": null
+            "items": null,
+            "metadata": {
+              "bbox": [
+                72.0,
+                60.17499923706055,
+                180.7790069580078,
+                75.28900146484375
+              ],
+              "source_block_type": "text"
+            }
           },
           {
             "type": "paragraph",
@@ -29,7 +38,16 @@
             "page": 4,
             "headers": null,
             "rows": null,
-            "items": null
+            "items": null,
+            "metadata": {
+              "bbox": [
+                72.0,
+                90.40303039550781,
+                119.07998657226562,
+                105.51702880859375
+              ],
+              "source_block_type": "text"
+            }
           },
           {
             "type": "paragraph",
@@ -37,7 +55,16 @@
             "page": 4,
             "headers": null,
             "rows": null,
-            "items": null
+            "items": null,
+            "metadata": {
+              "bbox": [
+                72.0,
+                105.51704406738281,
+                162.48597717285156,
+                120.63104248046875
+              ],
+              "source_block_type": "text"
+            }
           },
           {
             "type": "paragraph",
@@ -45,23 +72,36 @@
             "page": 4,
             "headers": null,
             "rows": null,
-            "items": null
+            "items": null,
+            "metadata": {
+              "bbox": [
+                72.0,
+                135.7450714111328,
+                130.07998657226562,
+                150.85906982421875
+              ],
+              "source_block_type": "text"
+            }
           },
           {
-            "type": "paragraph",
-            "text": "- Senior Developer at TechCo (2020-2024)",
+            "type": "list",
+            "text": "- Senior Developer at TechCo (2020-2024)\n- Junior Developer at StartupInc (2018-2020)",
             "page": 4,
             "headers": null,
             "rows": null,
-            "items": null
-          },
-          {
-            "type": "paragraph",
-            "text": "- Junior Developer at StartupInc (2018-2020)",
-            "page": 4,
-            "headers": null,
-            "rows": null,
-            "items": null
+            "items": [
+              "- Senior Developer at TechCo (2020-2024)",
+              "- Junior Developer at StartupInc (2018-2020)"
+            ],
+            "metadata": {
+              "bbox": [
+                72.0,
+                150.8590850830078,
+                290.2619323730469,
+                181.08709716796875
+              ],
+              "source_block_count": 2
+            }
           },
           {
             "type": "paragraph",
@@ -69,7 +109,16 @@
             "page": 5,
             "headers": null,
             "rows": null,
-            "items": null
+            "items": null,
+            "metadata": {
+              "bbox": [
+                72.0,
+                60.17499923706055,
+                177.13796997070312,
+                75.28900146484375
+              ],
+              "source_block_type": "text"
+            }
           },
           {
             "type": "paragraph",
@@ -77,15 +126,35 @@
             "page": 5,
             "headers": null,
             "rows": null,
-            "items": null
+            "items": null,
+            "metadata": {
+              "bbox": [
+                72.0,
+                90.40303039550781,
+                123.97498321533203,
+                105.51702880859375
+              ],
+              "source_block_type": "text"
+            }
           },
           {
-            "type": "paragraph",
+            "type": "list",
             "text": "- BS Computer Science, State University (2018)",
             "page": 5,
             "headers": null,
             "rows": null,
-            "items": null
+            "items": [
+              "- BS Computer Science, State University (2018)"
+            ],
+            "metadata": {
+              "bbox": [
+                72.0,
+                105.51704406738281,
+                304.9139709472656,
+                120.63104248046875
+              ],
+              "source_block_count": 1
+            }
           },
           {
             "type": "paragraph",
@@ -93,7 +162,16 @@
             "page": 5,
             "headers": null,
             "rows": null,
-            "items": null
+            "items": null,
+            "metadata": {
+              "bbox": [
+                72.0,
+                135.7450714111328,
+                100.72100067138672,
+                150.85906982421875
+              ],
+              "source_block_type": "text"
+            }
           },
           {
             "type": "paragraph",
@@ -101,7 +179,16 @@
             "page": 5,
             "headers": null,
             "rows": null,
-            "items": null
+            "items": null,
+            "metadata": {
+              "bbox": [
+                72.0,
+                150.8590850830078,
+                245.0299530029297,
+                165.97308349609375
+              ],
+              "source_block_type": "text"
+            }
           }
         ]
       }
@@ -116,7 +203,7 @@
     "page_end": 5,
     "page_count": 2,
     "extraction_method": "native",
-    "processing_timestamp": "2026-08-16T07:34:40.368351+00:00",
+    "processing_timestamp": "2026-08-16T10:07:07.368117+00:00",
     "content_hash": "cabca594c0d713bd",
     "model_versions": {
       "embedding": "sentence-transformers/all-MiniLM-L6-v2"

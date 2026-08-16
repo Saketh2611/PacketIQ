@@ -70,7 +70,7 @@ def main() -> None:
         "case": "empty_query",
         "query": "",
         "result": pipeline.query(""),
-        "note": "Empty query returns low-confidence or no results",
+        "note": "Empty query returns no results with an empty_query validation warning",
     }
     write_json(samples_dir / "failure_case_empty_query.json", failure)
     print(f"Sample outputs saved to {samples_dir}")

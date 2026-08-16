@@ -1,0 +1,74 @@
+{
+  "train_dataset": "nutrientdocs/openpss-mirror",
+  "train_config": "SHORT",
+  "test_dataset": "nutrientdocs/doc-split-benchmark",
+  "test_config": "our200",
+  "methods": {
+    "baseline_rule": {
+      "boundary_precision": 0.5319166666666666,
+      "boundary_recall": 0.5834166666666667,
+      "boundary_f1": 0.5330689033189033,
+      "page_grouping_accuracy": 0.573095238095238,
+      "streams_evaluated": 200,
+      "page_pairs_evaluated": 694,
+      "latency_seconds": 48.11903699999675
+    },
+    "baseline_embedding": {
+      "boundary_precision": 0.5345833333333333,
+      "boundary_recall": 0.5355,
+      "boundary_f1": 0.5171071428571429,
+      "page_grouping_accuracy": 0.581595238095238,
+      "streams_evaluated": 200,
+      "page_pairs_evaluated": 694,
+      "latency_seconds": 3.506092900002841
+    },
+    "learned_classifier": {
+      "boundary_precision": 0.7531428571428571,
+      "boundary_recall": 0.8900833333333332,
+      "boundary_f1": 0.7837550505050505,
+      "page_grouping_accuracy": 0.7222619047619048,
+      "streams_evaluated": 200,
+      "page_pairs_evaluated": 694,
+      "latency_seconds": 5.03387310000835
+    }
+  },
+  "notes": [
+    "Train/dev source: nutrientdocs/openpss-mirror (OpenPSS community mirror).",
+    "Test/eval source: nutrientdocs/doc-split-benchmark (official evaluation slice).",
+    "nutrientdocs/doc-split-v2 is referenced by the assignment but was not accessible on HuggingFace Hub.",
+    "Embedding model instance is reused across Stage 1 benchmark phases to avoid repeated model initialization.",
+    "Classifier scaler is fit after the train/validation split using training features only.",
+    "Document-type classification accuracy is not reported because these datasets provide boundary labels only."
+  ],
+  "dataset_stats": {
+    "train_rows": 40715,
+    "test_rows": 894,
+    "test_streams": 200,
+    "load_train_seconds": 56.367910600005416,
+    "load_test_seconds": 33.241351899981964
+  },
+  "classifier_training": {
+    "train_size": 32408,
+    "val_size": 8103,
+    "model_path": "C:\\Users\\v.saketh\\Desktop\\PacketIQ\\models\\boundary_classifier.joblib",
+    "feature_importance": {
+      "semantic_cosine": -0.09036614457467995,
+      "token_jaccard": 0.6828563452743235,
+      "text_length_ratio": 0.11161493026955809,
+      "layout_similarity": 0.0,
+      "block_position_similarity": 0.0,
+      "heading_style_similarity": 0.0,
+      "entity_overlap": -0.10693531524126064,
+      "structural_similarity": 0.1116149302695362,
+      "type_agreement": 0.30851555103410905
+    },
+    "latency_seconds": 2122.5104942999897
+  },
+  "resources": {
+    "wall_clock_seconds": 2179.1694972999976,
+    "peak_rss_mb": 3643.9609375,
+    "cpu_percent": 24.1,
+    "model_size_mb": 0.0014781951904296875,
+    "index_size_mb": null
+  }
+}
