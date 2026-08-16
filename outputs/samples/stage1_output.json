@@ -2,38 +2,38 @@
   "packet_id": "sample_packet",
   "source_file": "sample_packet.pdf",
   "page_count": 6,
-  "file_hash": "4adfdf0747555ca9",
+  "file_hash": "39866e53a908fceb",
   "method": "baseline",
-  "processing_time_seconds": 0.18371859984472394,
+  "processing_time_seconds": 85.41702459999942,
   "boundaries": [
     {
       "page_a": 1,
       "page_b": 2,
-      "score": 0.600075128176169,
+      "score": 0.6733785158914353,
       "is_boundary": false
     },
     {
       "page_a": 2,
       "page_b": 3,
-      "score": 0.5881459575469783,
+      "score": 0.7140860190795123,
       "is_boundary": false
     },
     {
       "page_a": 3,
       "page_b": 4,
-      "score": 0.37773234932002653,
+      "score": 0.3902819147086327,
       "is_boundary": true
     },
     {
       "page_a": 4,
       "page_b": 5,
-      "score": 0.6273160314898221,
+      "score": 0.6892074268019113,
       "is_boundary": false
     },
     {
       "page_a": 5,
       "page_b": 6,
-      "score": 0.37903546181242925,
+      "score": 0.4377682511087995,
       "is_boundary": true
     }
   ],
@@ -55,7 +55,7 @@
           1.0
         ]
       ],
-      "group_confidence": 0.5941105428615736
+      "group_confidence": 0.6937322674854738
     },
     {
       "document_id": "sample_packet_doc_002",
@@ -73,7 +73,7 @@
           1.0
         ]
       ],
-      "group_confidence": 0.6273160314898221
+      "group_confidence": 0.6892074268019113
     },
     {
       "document_id": "sample_packet_doc_003",

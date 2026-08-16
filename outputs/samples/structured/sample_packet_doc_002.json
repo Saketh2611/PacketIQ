@@ -116,7 +116,7 @@
     "page_end": 5,
     "page_count": 2,
     "extraction_method": "native",
-    "processing_timestamp": "2026-08-13T11:31:36.992987+00:00",
+    "processing_timestamp": "2026-08-16T07:34:40.368351+00:00",
     "content_hash": "cabca594c0d713bd",
     "model_versions": {
       "embedding": "sentence-transformers/all-MiniLM-L6-v2"

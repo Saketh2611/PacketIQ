@@ -140,7 +140,7 @@
     "page_end": 3,
     "page_count": 3,
     "extraction_method": "native",
-    "processing_timestamp": "2026-08-13T11:31:36.992987+00:00",
+    "processing_timestamp": "2026-08-16T07:34:40.367331+00:00",
     "content_hash": "3242e93978d6ccdd",
     "model_versions": {
       "embedding": "sentence-transformers/all-MiniLM-L6-v2"
