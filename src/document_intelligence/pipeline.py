@@ -179,11 +179,22 @@ class DocumentIntelligencePipeline:
         self.vector_store.load(path)
         self.retriever = EvidenceRetriever(self.vector_store, self.embedder)
 
-    def query(self, query_text: str, top_k: int | None = None) -> dict[str, Any]:
+    def query(
+        self,
+        query_text: str,
+        top_k: int | None = None,
+        use_reranker: bool | None = None,
+        document_type: str | None = None,
+    ) -> dict[str, Any]:
         if self.retriever is None:
             self.load_index()
         assert self.retriever is not None
-        response = self.retriever.retrieve(query_text, top_k=top_k)
+        response = self.retriever.retrieve(
+            query_text,
+            top_k=top_k,
+            document_type=document_type,
+            use_reranker=use_reranker,
+        )
         return {
             "query": response.query,
             "results": [r.model_dump() for r in response.results],

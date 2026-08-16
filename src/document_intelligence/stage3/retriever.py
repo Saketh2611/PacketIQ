@@ -74,8 +74,15 @@ class EvidenceRetriever:
                 use_reranker = self.reranker.enabled
 
             if use_reranker:
-                rerank_candidates = candidates[: self.rerank_top_n]
-                reranked = self.reranker.rerank(query, rerank_candidates)
+                # The per-call override must also reach the Reranker instance itself —
+                # rerank() early-exits on self.enabled regardless of what's passed here.
+                previous_enabled = self.reranker.enabled
+                self.reranker.enabled = True
+                try:
+                    rerank_candidates = candidates[: self.rerank_top_n]
+                    reranked = self.reranker.rerank(query, rerank_candidates)
+                finally:
+                    self.reranker.enabled = previous_enabled
                 norm_vec = normalize_scores([s for _, s, _ in reranked])
                 evidence_list: list[Evidence] = []
                 for i, (rec, vec_score, rr_score) in enumerate(reranked[:top_k]):

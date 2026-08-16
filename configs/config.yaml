@@ -31,7 +31,7 @@ stage3:
   top_k: 5
   retrieval_top_n: 50
   rerank_top_n: 20
-  use_reranker: false
+  use_reranker: true
   normalize_embeddings: true
 
 ocr:

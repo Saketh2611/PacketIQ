@@ -73,7 +73,7 @@ class Settings(BaseSettings):
     top_k: int = 5
     retrieval_top_n: int = 50
     rerank_top_n: int = 20
-    use_reranker: bool = False
+    use_reranker: bool = True
 
     # LLM (optional)
     gemini_api_key: str | None = None

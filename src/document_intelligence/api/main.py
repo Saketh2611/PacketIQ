@@ -88,7 +88,12 @@ def index_documents(request: IndexRequest) -> IndexResponse:
 @app.post("/retrieve", response_model=RetrieveResponse)
 def retrieve(request: RetrieveRequest) -> RetrieveResponse:
     try:
-        result = pipeline.query(request.query, top_k=request.top_k)
+        result = pipeline.query(
+            request.query,
+            top_k=request.top_k,
+            use_reranker=request.use_reranker,
+            document_type=request.document_type,
+        )
     except FileNotFoundError:
         raise HTTPException(status_code=404, detail="Index not found. Run /index first.")
     return RetrieveResponse(**result)
