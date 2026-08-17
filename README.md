@@ -105,11 +105,167 @@ Detailed diagrams: [docs/architecture.md](docs/architecture.md)
 
 ---
 
-## Three-Stage Pipeline
+### Stage 1: Page-Pair Boundary Detection, Grouping, and Naming
 
-### Stage 1: Page-Pair Boundary Detection
+Stage 1 answers two separate questions in sequence, and it's important to keep them separate
+because **two different classifiers are responsible for two different jobs**:
 
-For each adjacent page pair `(i, i+1)`, the system computes **9 engineered features**:
+1. **"Where does one document end and the next begin?"** — answered by the **boundary
+   classifier**, which only ever looks at *pairs* of adjacent pages and decides yes/no: same
+   document, or a split here. It has no idea what the documents are called at this point — it
+   only produces groups of page numbers.
+2. **"What is each of those groups actually called?"** — answered separately, *after* grouping is
+   already done, by the **document classifier**, which reads the full text of an already-formed
+   group and assigns a type label (`invoice`, `resume`, `passport`, etc.) with a confidence score.
+
+The entry point for the whole sequence is `DocumentIntelligencePipeline.run_stage1()` in
+`src/document_intelligence/pipeline.py`. Everything below follows that method's exact call order.
+
+#### Step 1 — Extract raw pages from the PDF
+
+**File:** `src/document_intelligence/ingestion/page_extractor.py` (invoked via
+`pipeline.extract_pages()`)
+
+The PDF is opened and every page is turned into a `PageRepresentation` object: raw text, a list of
+text blocks with bounding boxes, block count, page width/height, image count, and whether native
+text extraction found enough content. If a page has too little native text
+(`text_length < ocr_min_text_length`, default 50 characters), it's flagged for OCR fallback, handled
+by `src/document_intelligence/ingestion/ocr.py` (`pytesseract`) — this only applies to real scanned
+pages; it never runs for the HuggingFace dataset benchmark, since those datasets provide
+pre-extracted text directly and never touch a PDF file at all. Nothing about document boundaries or
+types is decided in this step; it just turns page images/PDF content into structured per-page data
+that later steps can compute features from.
+
+#### Step 2 — Build a 9-feature vector for every adjacent page pair
+
+**File:** `src/document_intelligence/stage1/page_features.py` — class `PageFeatureBuilder`
+
+For every pair of adjacent pages `(page_i, page_i+1)`, `build_pair()` computes 9 numbers that
+describe how similar the two pages are, using helper functions from
+`src/document_intelligence/stage1/similarity.py`:
+
+| # | Feature | What it measures | Computed in |
+|---|---------|-------------------|-------------|
+| 1 | `semantic_cosine` | Cosine similarity between the two pages' text embeddings | `similarity.cosine_similarity()`, embeddings from `stage3/embeddings.py` |
+| 2 | `token_jaccard` | Overlap of the words used on each page | `similarity.normalized_overlap()` |
+| 3 | `text_length_ratio` | How similar the two pages' text lengths are | `similarity.text_length_ratio()` |
+| 4 | `layout_similarity` | Block-count and page-dimension similarity | `similarity.layout_similarity()` |
+| 5 | `block_position_similarity` | Similarity of where text blocks sit on the page | `similarity.block_position_similarity()` |
+| 6 | `heading_style_similarity` | Similarity in how many headings each page has | `similarity.heading_style_similarity()` |
+| 7 | `entity_overlap` | Shared proper nouns / numbers / dollar amounts | `similarity.jaccard_entities()` |
+| 8 | `structural_similarity` | Combined structural signal (length, images, headings) | `similarity.structural_similarity()` |
+| 9 | `type_agreement` | Do the two pages *look* like the same document type? | see note below |
+
+**Important detail on feature 9:** `type_agreement` calls a lightweight
+`HeuristicDocumentClassifier` (defined in `document_classifier.py`) internally, once per page, just
+to get a quick type *guess* for each page individually — purely as one signal among nine for
+deciding whether a boundary exists. **This is not the same call, and not the same purpose, as the
+final document naming in Step 4.** It's a cheap hint used only to help the boundary decision; the
+real naming happens later, on the whole grouped document, and can produce a different (usually more
+reliable) answer.
+
+The output of this step is a list of `PagePairFeatures` objects — one 9-number vector per adjacent
+page pair. No boundary decision has been made yet; this step only produces the *inputs* to that
+decision.
+
+#### Step 3 — Decide, per page pair, whether there's a boundary
+
+**Files:** `src/document_intelligence/stage1/boundary_baseline.py` and
+`src/document_intelligence/stage1/boundary_classifier.py`
+
+This is **the boundary classifier** — the component responsible for "which pages belong together."
+Three interchangeable methods can produce this decision (selected via `method=` in
+`run_stage1()`):
+
+- **`baseline`** (`BoundaryBaseline`, mode `"weighted"`) — combines all 9 features into one score
+  using fixed, configured weights (`score_pair()`), then compares against a threshold
+  (`settings.boundary_threshold`, default 0.5). Score below threshold → boundary.
+- **`embedding`** (`BoundaryBaseline`, mode `"embedding_only"`) — uses only feature 1
+  (`semantic_cosine`) and ignores the other 8.
+- **`learned`** (`BoundaryClassifier`) — a trained Logistic Regression model over all 9 features.
+  This is the strongest method (F1 0.784 vs. 0.533 for the rule baseline — see
+  `docs/benchmark_report.md`), but it requires `models/boundary_classifier.joblib` to already exist
+  (produced by `python scripts/run_benchmarks.py --stage stage1`); if that file is missing, the
+  pipeline logs a warning and **silently falls back to `baseline`**.
+
+Every method produces the same output shape regardless of which one ran: a list of
+`BoundaryDecision` objects, one per adjacent page pair, each with a `score` and a boolean
+`is_boundary`. At this point, the system knows exactly where the splits are — but the pages are
+still just numbered, with no document identity or type attached.
+
+#### Step 4a — Turn per-pair decisions into contiguous page groups
+
+**File:** `src/document_intelligence/stage1/grouping.py` — function `decisions_to_groups()`
+
+This is a simple sequential sweep: page 1 always starts the first group. For every subsequent page,
+if the boundary decision for that pair says `is_boundary=True`, a **new** group starts at that
+page; otherwise, the page is appended to the **current** group. Each finished group is wrapped in a
+`DocumentGroup` (page numbers, page range, and a `group_confidence` averaged from the boundary
+scores that held it together). This is the step that literally answers "which pages belong to
+which document" — but the groups it produces are still unnamed; they only have positions
+(`document_id` at this point is just an incrementing counter like `packet_doc_001`), not a type.
+
+#### Step 4b — Classify each group's document type ("the naming step")
+
+**File:** `src/document_intelligence/stage1/document_classifier.py`
+
+This is a **separate classifier from the boundary one**, and it only runs *after* grouping is
+finished — it never influences where the boundaries were drawn (aside from the lightweight
+per-page hint used inside feature 9, described above). For each finished `DocumentGroup`,
+`pipeline.run_stage1()` calls:
+
+```python
+classification = self.doc_classifier.classify_pages(group_pages)
+```
+
+`DocumentClassifier.classify_pages()` reads the **combined text of every page in that group** (not
+one page at a time) and assigns a type:
+
+- **`HeuristicDocumentClassifier`** (the classifier actually used by default —
+  `DocumentClassifier(use_embedding=False)` in `pipeline.py`) matches the group's combined text
+  against keyword patterns per type (`TYPE_PATTERNS` — e.g. `invoice` looks for `"invoice"`,
+  `"bill to"`, `"total amount"`, `"subtotal"`; `resume` looks for `"resume"`, `"curriculum vitae"`,
+  `"experience"`, `"education"`, `"skills"`; similarly for `passport`, `contract`, `receipt`,
+  `letter`, `report`, `form`). Whichever type has the most matching patterns wins; if nothing
+  matches, the group is labeled `"unknown"` rather than a forced guess.
+- **`EmbeddingDocumentClassifier`** is also fully implemented (nearest-prototype matching using
+  Sentence Transformer embeddings instead of keywords) but is **not currently active** —
+  `pipeline.py` constructs `DocumentClassifier` with `use_embedding=False`, so this path is dead
+  code in the running system today. It's kept as a documented alternative for future work (see
+  `docs/technical_report.md`, Future Improvements) because it would need labeled example text per
+  document type to build its prototypes, which the boundary-labeled training datasets don't
+  provide.
+- Confidence for either classifier is computed in `src/document_intelligence/stage1/confidence.py`
+  (`classifier_confidence()`), which just clips the raw match/similarity score into `[0, 1]`.
+
+The result — `document_type` and `confidence` — is attached back onto the group in
+`pipeline.run_stage1()`'s final assembly loop, producing the finished per-document record:
+
+```python
+{
+    "document_id": group.document_id,
+    "page_start": group.page_start,
+    "page_end": group.page_end,
+    "page_numbers": group.page_numbers,
+    "document_type": classification.document_type,
+    "confidence": classification.confidence,
+    "candidates": classification.candidates,
+    "group_confidence": group.group_confidence,
+}
+```
+
+#### Summary — who's responsible for what
+
+| Question | Answered by | File |
+|---|---|---|
+| How similar are two adjacent pages? | `PageFeatureBuilder` | `stage1/page_features.py` (+ `stage1/similarity.py`) |
+| Is there a document boundary between them? | `BoundaryBaseline` / `BoundaryClassifier` | `stage1/boundary_baseline.py`, `stage1/boundary_classifier.py` |
+| Which pages belong to the same document? | `decisions_to_groups()` | `stage1/grouping.py` |
+| What is that document actually called? | `DocumentClassifier` (→ `HeuristicDocumentClassifier`) | `stage1/document_classifier.py` |
+| How confident is each of the above? | `classifier_confidence()` and related helpers | `stage1/confidence.py` |
+| Orchestrates all of the above in order | `run_stage1()` | `pipeline.py` |
+
+For each adjacent page pair `(i, i+1)`, the 9 engineered features computed in Step 2 are:
 
 | Feature | Description |
 |---------|-------------|
@@ -121,23 +277,21 @@ For each adjacent page pair `(i, i+1)`, the system computes **9 engineered featu
 | `heading_style_similarity` | Heading count similarity |
 | `entity_overlap` | Named entity / number overlap |
 | `structural_similarity` | Combined structural signals |
-| `type_agreement` | Heuristic document-type agreement |
+| `type_agreement` | Lightweight per-page heuristic type hint agreement (not the final classification — see Step 2 note above) |
 
-Three methods are compared:
+Three boundary-decision methods are available (Step 3):
 
 | Method | Description |
 |--------|-------------|
-| `baseline` | Weighted rule/threshold on all features |
+| `baseline` | Weighted rule/threshold on all 9 features |
 | `embedding` | Cosine similarity threshold only |
-| `learned` | Logistic Regression (or XGBoost) on feature vector |
+| `learned` | Logistic Regression on the full 9-feature vector |
 
 > **`learned` requires a trained model first.** It loads `models/boundary_classifier.joblib`, which is **not** included in the repo (it's gitignored and only produced by training). If that file is missing, the pipeline logs a warning and **silently falls back to `baseline`** — you won't get an error, just baseline-quality results. Train it with:
 > ```bash
 > python scripts/run_benchmarks.py --stage stage1
 > ```
 > This downloads the configured HuggingFace datasets and trains on the full OpenPSS mirror train split (~40k rows), so it needs internet access and a few minutes. Use `--max-train-streams N` to train on a smaller subset for a quick smoke test.
-
-Boundary decisions are converted to contiguous page groups. Each group is classified using heuristic classification; an embedding-prototype classifier is also implemented as an alternative but is not currently wired into the main pipeline because the available page-stream datasets do not provide document-type labels.
 
 ### Stage 2: Structured Document Representation
 
@@ -873,4 +1027,3 @@ Validation included dataset schema inspection, benchmark artifact inspection, ve
 - **OpenPSS mirror:** redistribution of the OpenPSS page-stream segmentation benchmark ([University of Amsterdam / HuggingFace](https://huggingface.co/datasets/nutrientdocs/openpss-mirror))
 - **Doc-split benchmark:** official evaluation slice ([HuggingFace](https://huggingface.co/datasets/nutrientdocs/doc-split-benchmark))
 - **Doc-split-v2:** proprietary/commercial model card; not used as a dataset or model in this implementation.
-
