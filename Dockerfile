@@ -15,6 +15,9 @@ COPY scripts/ scripts/
 RUN pip install --no-cache-dir -r requirements.txt && \
     pip install --no-cache-dir -e .
 
+RUN python -c "from sentence_transformers import SentenceTransformer; SentenceTransformer('sentence-transformers/all-MiniLM-L6-v2')"
+RUN python -c "from sentence_transformers import CrossEncoder; CrossEncoder('cross-encoder/ms-marco-MiniLM-L-6-v2')"
+
 COPY data/ data/
 COPY outputs/ outputs/
 
